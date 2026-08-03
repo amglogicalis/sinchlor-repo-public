@@ -10,6 +10,8 @@ class SinchlorStudio {
     this.paradeKey = '';
     this.currentParade = null;
     this.currentMember = null;
+    this.confirmCallback = null;
+    this.nectarTimerInterval = null;
     this.state = {
       petals: {},
       parades: {},
@@ -24,6 +26,37 @@ class SinchlorStudio {
     if (savedToken) {
       document.getElementById('login-token').value = savedToken;
     }
+    this.startNectarLiveTimer();
+  }
+
+  startNectarLiveTimer() {
+    if (this.nectarTimerInterval) clearInterval(this.nectarTimerInterval);
+    this.nectarTimerInterval = setInterval(() => {
+      this.updateNectarCountdownDisplays();
+    }, 1000);
+  }
+
+  updateNectarCountdownDisplays() {
+    const elements = document.querySelectorAll('.nectar-countdown');
+    const now = Date.now();
+
+    elements.forEach(el => {
+      const expiresAtStr = el.getAttribute('data-expires');
+      if (!expiresAtStr) return;
+
+      const expiresAt = new Date(expiresAtStr).getTime();
+      const diffMs = expiresAt - now;
+
+      if (diffMs <= 0) {
+        el.innerHTML = `<span class="badge badge-magenta">⚠️ EXPIRADO</span>`;
+      } else {
+        const totalSecs = Math.floor(diffMs / 1000);
+        const mins = Math.floor(totalSecs / 60);
+        const secs = totalSecs % 60;
+        const formatted = `⏳ ${mins}m ${secs.toString().padStart(2, '0')}s restantes`;
+        el.innerHTML = `<span class="badge badge-gold">${formatted}</span>`;
+      }
+    });
   }
 
   switchLoginMode(mode) {
@@ -238,6 +271,7 @@ class SinchlorStudio {
         <td><span class="badge badge-crimson">${p.category || 'general'}</span></td>
         <td>
           <button class="btn btn-outline btn-sm" onclick="app.openRevealModal('${p.alias}')">👁️ Revelar</button>
+          <button class="btn btn-outline btn-sm" onclick="app.openEditPetalModal('${p.alias}')">✏️ Editar</button>
         </td>
       </tr>
     `).join('');
@@ -261,7 +295,8 @@ class SinchlorStudio {
         <td><span style="font-size: 0.8rem; color: var(--text-muted);">${new Date(p.createdAt || Date.now()).toLocaleDateString()}</span></td>
         <td>
           <button class="btn btn-outline btn-sm" onclick="app.openRevealModal('${p.alias}')">👁️ Revelar</button>
-          <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.deletePetal('${p.alias}')">🗑️</button>
+          <button class="btn btn-outline btn-sm" onclick="app.openEditPetalModal('${p.alias}')">✏️ Editar</button>
+          <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.confirmDeletePetal('${p.alias}')">🗑️</button>
         </td>
       </tr>
     `).join('');
@@ -300,20 +335,22 @@ class SinchlorStudio {
     const traps = Object.values(this.state.traps || {});
 
     if (traps.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Sin PetalTraps 🌸 sembradas.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Sin PetalTraps 🌸 sembradas.</td></tr>`;
       return;
     }
 
     tbody.innerHTML = traps.map(t => `
       <tr>
         <td><code>${t.alias}</code></td>
+        <td><span style="font-size: 0.85rem; color: var(--text-muted);">${t.targetFile || 'amglogicalis/.sinchlor-storage'}</span></td>
         <td><span style="font-family: monospace; color: var(--accent-gold);">${t.decoyToken.slice(0, 14)}...</span></td>
         <td><span class="badge badge-green">Discord / Telegram / Issue</span></td>
         <td><span class="badge badge-magenta">${t.triggeredCount || 0} disparos</span></td>
         <td>
           <button class="btn btn-outline btn-sm" onclick="app.triggerTrap('${t.trapId}')">🔥 Probar</button>
+          <button class="btn btn-outline btn-sm" onclick="app.recreateTrap('${t.trapId}')">🔄 Recrear</button>
           <button class="btn btn-outline btn-sm" onclick="app.openEditTrapModal('${t.trapId}')">✏️ Editar</button>
-          <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.deleteTrap('${t.trapId}')">🗑️</button>
+          <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.confirmDeleteTrap('${t.trapId}')">🗑️</button>
         </td>
       </tr>
     `).join('');
@@ -332,15 +369,21 @@ class SinchlorStudio {
       <tr>
         <td><code>${n.alias}</code></td>
         <td><span class="badge badge-gold">${n.singleUse ? '1-Solo Uso' : 'TTL Temporizado'}</span></td>
-        <td>${n.expiresAt ? new Date(n.expiresAt).toLocaleTimeString() : 'Sin expiración'}</td>
+        <td>
+          <div class="nectar-countdown" data-expires="${n.expiresAt || ''}">
+            ${n.expiresAt ? `<span class="badge badge-gold">Calculando...</span>` : '<span class="badge badge-green">Permanente</span>'}
+          </div>
+        </td>
         <td><span class="badge ${n.used ? 'badge-magenta' : 'badge-green'}">${n.used ? 'Consumido' : 'Disponible'}</span></td>
         <td>
           <button class="btn btn-outline btn-sm" onclick="app.consumeNectar('${n.nectarId}')" ${n.used ? 'disabled' : ''}>🏵️ Consumir</button>
           <button class="btn btn-outline btn-sm" onclick="app.openEditNectarModal('${n.nectarId}')">✏️ Editar</button>
-          <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.deleteNectar('${n.nectarId}')">🗑️</button>
+          <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.confirmDeleteNectar('${n.nectarId}')">🗑️</button>
         </td>
       </tr>
     `).join('');
+
+    this.updateNectarCountdownDisplays();
   }
 
   renderTeamMembers() {
@@ -355,10 +398,62 @@ class SinchlorStudio {
         <td><code>${m.customIamRole || 'sinchlor:role:' + m.role}</code></td>
         <td><span style="font-family: monospace; color: var(--accent-gold);">${m.paradeKey}</span></td>
         <td>
-          <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.removeMember('${m.userId}')">Revocar 🗑️</button>
+          <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.confirmRemoveMember('${m.userId}')">Revocar 🗑️</button>
         </td>
       </tr>
     `).join('');
+  }
+
+  // 🌺 PETAL ACTIONS & EDIT
+  openEditPetalModal(alias) {
+    const petal = this.state.petals[alias];
+    if (!petal) return;
+
+    document.getElementById('edit-petal-old-alias').value = alias;
+    document.getElementById('edit-petal-alias').value = petal.alias;
+    document.getElementById('edit-petal-category').value = petal.category || '';
+    document.getElementById('edit-petal-desc').value = petal.description || '';
+    document.getElementById('edit-petal-secret').value = '';
+    this.openModal('edit-petal-modal');
+  }
+
+  handleSaveEditPetal(e) {
+    e.preventDefault();
+    const oldAlias = document.getElementById('edit-petal-old-alias').value;
+    const newAlias = document.getElementById('edit-petal-alias').value.trim().replace(/^\[?sinchlor:/, '').replace(/\]$/, '');
+    const category = document.getElementById('edit-petal-category').value.trim() || 'general';
+    const desc = document.getElementById('edit-petal-desc').value.trim();
+    const newSecret = document.getElementById('edit-petal-secret').value.trim();
+
+    if (this.state.petals[oldAlias]) {
+      const existing = this.state.petals[oldAlias];
+      delete this.state.petals[oldAlias];
+
+      this.state.petals[newAlias] = {
+        petalId: existing.petalId,
+        alias: newAlias,
+        secretValue: newSecret || existing.secretValue,
+        category,
+        description: desc,
+        createdAt: existing.createdAt,
+        updatedAt: new Date().toISOString()
+      };
+
+      this.closeModal('edit-petal-modal');
+      this.showToast(`Pétalo 'sinchlor:${newAlias}' modificado con éxito. 🌺`, 'success');
+      this.renderAll();
+    }
+  }
+
+  confirmDeletePetal(alias) {
+    this.openConfirmModal(
+      `¿Deseas eliminar el pétalo semántico 'sinchlor:${alias}'?`,
+      () => {
+        delete this.state.petals[alias];
+        this.showToast(`Pétalo 'sinchlor:${alias}' eliminado.`, 'success');
+        this.renderAll();
+      }
+    );
   }
 
   // 🌸 PETALTRAPS ACTIONS
@@ -373,6 +468,15 @@ class SinchlorStudio {
     this.renderAll();
   }
 
+  recreateTrap(trapId) {
+    const trap = this.state.traps[trapId];
+    if (!trap) return;
+
+    trap.decoyToken = `ghp_trap_${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 6)}_decoy`;
+    this.showToast(`🌸 PetalTrap '${trap.alias}' re-creada con nuevo token señuelo.`, 'success');
+    this.renderAll();
+  }
+
   openEditTrapModal(trapId) {
     const trap = this.state.traps[trapId];
     if (!trap) return;
@@ -380,6 +484,7 @@ class SinchlorStudio {
     document.getElementById('edit-trap-id').value = trap.trapId;
     document.getElementById('edit-trap-alias').value = trap.alias;
     document.getElementById('edit-trap-file').value = trap.targetFile || '';
+    document.getElementById('edit-trap-discord').value = trap.alertChannels?.discordWebhook || '';
     this.openModal('edit-trap-modal');
   }
 
@@ -388,23 +493,32 @@ class SinchlorStudio {
     const trapId = document.getElementById('edit-trap-id').value;
     const alias = document.getElementById('edit-trap-alias').value.trim();
     const file = document.getElementById('edit-trap-file').value.trim();
+    const discord = document.getElementById('edit-trap-discord').value.trim();
 
     if (this.state.traps[trapId]) {
       this.state.traps[trapId].alias = alias;
       this.state.traps[trapId].targetFile = file;
+      if (!this.state.traps[trapId].alertChannels) this.state.traps[trapId].alertChannels = {};
+      this.state.traps[trapId].alertChannels.discordWebhook = discord || undefined;
+
       this.closeModal('edit-trap-modal');
       this.showToast(`PetalTrap '${alias}' modificada con éxito. 🌸`, 'success');
       this.renderAll();
     }
   }
 
-  deleteTrap(trapId) {
+  confirmDeleteTrap(trapId) {
     const trap = this.state.traps[trapId];
-    if (trap && confirm(`¿Seguro que deseas eliminar la trampa '${trap.alias}'?`)) {
-      delete this.state.traps[trapId];
-      this.showToast(`PetalTrap '${trap.alias}' eliminada.`, 'success');
-      this.renderAll();
-    }
+    if (!trap) return;
+
+    this.openConfirmModal(
+      `¿Deseas eliminar la PetalTrap '${trap.alias}'?`,
+      () => {
+        delete this.state.traps[trapId];
+        this.showToast(`PetalTrap '${trap.alias}' eliminada.`, 'success');
+        this.renderAll();
+      }
+    );
   }
 
   // 🏵️ NECTAR EFIMERO ACTIONS
@@ -443,26 +557,36 @@ class SinchlorStudio {
     const nectarId = document.getElementById('edit-nectar-id').value;
     const alias = document.getElementById('edit-nectar-alias').value.trim();
     const secret = document.getElementById('edit-nectar-secret').value.trim();
+    const ttlMins = parseInt(document.getElementById('edit-nectar-ttl').value || '15', 10);
 
     if (this.state.nectars[nectarId]) {
       this.state.nectars[nectarId].alias = alias;
       if (secret) this.state.nectars[nectarId].secretValue = secret;
+      if (ttlMins > 0) {
+        this.state.nectars[nectarId].expiresAt = new Date(Date.now() + ttlMins * 60000).toISOString();
+      }
+
       this.closeModal('edit-nectar-modal');
       this.showToast(`Néctar '${alias}' modificado con éxito. 🏵️`, 'success');
       this.renderAll();
     }
   }
 
-  deleteNectar(nectarId) {
+  confirmDeleteNectar(nectarId) {
     const nectar = this.state.nectars[nectarId];
-    if (nectar && confirm(`¿Seguro que deseas eliminar el néctar '${nectar.alias}'?`)) {
-      delete this.state.nectars[nectarId];
-      this.showToast(`Néctar '${nectar.alias}' eliminado.`, 'success');
-      this.renderAll();
-    }
+    if (!nectar) return;
+
+    this.openConfirmModal(
+      `¿Deseas eliminar el néctar efímero '${nectar.alias}'?`,
+      () => {
+        delete this.state.nectars[nectarId];
+        this.showToast(`Néctar '${nectar.alias}' eliminado.`, 'success');
+        this.renderAll();
+      }
+    );
   }
 
-  // 🌺 PETAL ACTIONS
+  // 🌺 PETAL CREATION
   handleCreatePetal(e) {
     e.preventDefault();
     const alias = document.getElementById('petal-alias').value.trim();
@@ -495,18 +619,11 @@ class SinchlorStudio {
     this.openModal('reveal-petal-modal');
   }
 
-  deletePetal(alias) {
-    if (confirm(`¿Seguro que deseas eliminar el pétalo 'sinchlor:${alias}'?`)) {
-      delete this.state.petals[alias];
-      this.showToast(`Pétalo '${alias}' eliminado.`, 'success');
-      this.renderAll();
-    }
-  }
-
   // 🌸 PETALTRAP CREATION
   handleCreateTrap(e) {
     e.preventDefault();
     const alias = document.getElementById('trap-alias').value.trim();
+    const targetFile = document.getElementById('trap-target-file').value.trim();
     const discord = document.getElementById('trap-discord').value.trim();
     const telegramToken = document.getElementById('trap-telegram-token').value.trim();
     const telegramChat = document.getElementById('trap-telegram-chat').value.trim();
@@ -516,6 +633,7 @@ class SinchlorStudio {
     const trap = {
       trapId,
       alias: cleanAlias,
+      targetFile: targetFile || 'amglogicalis/.sinchlor-storage',
       decoyToken: `ghp_trap_${Math.random().toString(36).slice(2, 10)}_decoy`,
       alertChannels: {
         discordWebhook: discord || undefined,
@@ -564,6 +682,7 @@ class SinchlorStudio {
     this.renderAll();
   }
 
+  // 🛡️ PETALSHIELD GUARD SCANNER (CLIENT-SIDE SCANNER)
   testPetalShieldScan() {
     const text = document.getElementById('scanner-input').value;
     if (!text) return;
@@ -571,22 +690,66 @@ class SinchlorStudio {
     const list = document.getElementById('scan-results-list');
     const container = document.getElementById('scan-results-container');
 
+    const signatures = [
+      { type: 'GitHub PAT', regex: /ghp_[A-Za-z0-9]{36}/g },
+      { type: 'GitHub OAuth Token', regex: /gho_[A-Za-z0-9]{36}/g },
+      { type: 'GitHub Fine-Grained Token', regex: /github_pat_[A-Za-z0-9_]{80,}/g },
+      { type: 'OpenAI Project API Key', regex: /sk-proj-[A-Za-z0-9_-]{20,}/g },
+      { type: 'OpenAI Standard Key', regex: /sk-[A-Za-z0-9]{20,}/g },
+      { type: 'Anthropic API Key', regex: /sk-ant-[A-Za-z0-9_-]{20,}/g },
+      { type: 'AWS Access Key ID', regex: /AKIA[0-9A-Z]{16}/g },
+      { type: 'Stripe Secret Key', regex: /sk_live_[0-9a-zA-Z]{20,}/g },
+      { type: 'Google AI Key', regex: /AIzaSy[A-Za-z0-9_-]{33}/g }
+    ];
+
+    const lines = text.split('\n');
     const matches = [];
-    if (text.match(/ghp_[A-Za-z0-9]{36}/)) {
-      matches.push({ type: 'GitHub PAT', match: text.match(/ghp_[A-Za-z0-9]{36}/)[0] });
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.includes('sinchlor-ignore')) continue; // Skip ignored lines
+
+      for (const sig of signatures) {
+        const regex = new RegExp(sig.regex.source, 'g');
+        let match;
+        while ((match = regex.exec(line)) !== null) {
+          matches.push({
+            lineNumber: i + 1,
+            type: sig.type,
+            matchedString: match[0],
+            suggestedAlias: `auto_${sig.type.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${i + 1}`
+          });
+        }
+      }
     }
 
     container.style.display = 'block';
     if (matches.length === 0) {
-      list.innerHTML = `<div style="color: var(--accent-green);">✅ Código limpio. No se detectaron credenciales expuestas ni alta entropía.</div>`;
+      list.innerHTML = `<div style="color: var(--accent-green); padding: 0.75rem; background: rgba(16, 185, 129, 0.1); border-radius: 8px;">✅ Código limpio. No se detectaron credenciales expuestas ni firmas de riesgo.</div>`;
     } else {
       list.innerHTML = matches.map(m => `
-        <div style="background: rgba(239, 68, 68, 0.1); border-left: 3px solid #ef4444; padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 4px;">
-          <strong style="color: #ef4444;">⚠️ CREDENCIAL EXPUESTA DETECTADA: [${m.type}]</strong><br>
-          <code>${m.match}</code> → Sugerencia PetalShield: Convertir a <code>sinchlor:auto_key</code>
+        <div style="background: rgba(239, 68, 68, 0.12); border-left: 4px solid #ef4444; padding: 0.85rem; margin-bottom: 0.6rem; border-radius: 6px;">
+          <strong style="color: #ef4444; font-size: 0.9rem;">⚠️ CREDENCIAL EXPUESTA DETECTADA: [${m.type}]</strong><br>
+          <span style="font-size: 0.8rem; color: var(--text-muted);">Línea ${m.lineNumber}:</span> <code style="color: #fca5a5; font-family: var(--font-mono);">${m.matchedString}</code><br>
+          <span style="font-size: 0.8rem; color: var(--accent-green); font-weight: 500;">💡 Sugerencia PetalShield: Convertir a alias <code>sinchlor:${m.suggestedAlias}</code></span>
         </div>
       `).join('');
     }
+  }
+
+  // CUSTOM GLASS CONFIRMATION MODAL (#780510 Theme)
+  openConfirmModal(message, onConfirm) {
+    document.getElementById('confirm-modal-message').textContent = message;
+    this.confirmCallback = onConfirm;
+    this.openModal('confirm-modal');
+  }
+
+  closeConfirmModal(confirmed) {
+    this.closeModal('confirm-modal');
+    if (confirmed && typeof this.confirmCallback === 'function') {
+      this.confirmCallback();
+    }
+    this.confirmCallback = null;
   }
 
   switchTab(tabId) {
