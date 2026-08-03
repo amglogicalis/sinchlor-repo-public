@@ -125,11 +125,19 @@ class SinchlorStudio {
     this.paradeName = document.getElementById('parade-name-input').value.trim();
     this.paradeKey = document.getElementById('parade-key-input').value.trim();
 
-    this.token = this.paradeKey.startsWith('ghp_') ? this.paradeKey : (localStorage.getItem('sinchlor_token') || '');
+    // Support PAT:ParadeKey combined format
+    let inputPat = '';
+    let inputKey = this.paradeKey;
 
-    if (!this.token) {
-      this.token = this.paradeKey;
+    if (this.paradeKey.includes(':')) {
+      const parts = this.paradeKey.split(':');
+      inputPat = parts[0].trim();
+      inputKey = parts[1].trim();
+    } else if (this.paradeKey.startsWith('ghp_')) {
+      inputPat = this.paradeKey;
     }
+
+    this.token = inputPat || localStorage.getItem('sinchlor_token') || '';
 
     this.showToast('Autenticando en Sinchlor Parade 🎪...', 'info');
     await this.loadVaultState();
@@ -143,12 +151,12 @@ class SinchlorStudio {
       return;
     }
 
-    // Flexible authentication: Parade Key OR PAT OR Admin Key
+    // Flexible authentication
     let member = Object.values(parade.members || {}).find(
-      m => m.paradeKey === this.paradeKey || m.userId === this.paradeKey
+      m => m.paradeKey === inputKey || m.userId === inputKey
     );
 
-    if (!member && (this.paradeKey === parade.adminKey || (this.paradeKey.startsWith('ghp_') && this.paradeKey.length > 20))) {
+    if (!member && (inputKey === parade.adminKey || inputKey.startsWith('ghp_') || inputPat.startsWith('ghp_'))) {
       member = Object.values(parade.members || {}).find(m => m.role === 'admin') || {
         userId: 'admin',
         name: parade.adminUser,
@@ -186,7 +194,7 @@ class SinchlorStudio {
     document.getElementById('app-container').style.display = 'flex';
 
     const pName = this.currentParade.name;
-    const roleText = this.currentMember.customIamRole ? `LUMINA/IAM (${this.currentMember.customIamRole})` : this.currentMember.role.toUpperCase();
+    const roleText = this.currentMember.customIamRole ? `${this.currentMember.customIamRole}` : this.currentMember.role.toUpperCase();
 
     document.getElementById('console-mode-subtitle').textContent = `🎪 Parade "${pName}"`;
     document.getElementById('header-title').textContent = `🎪 Sinchlor Parade "${pName}" Console`;
@@ -213,7 +221,6 @@ class SinchlorStudio {
         const encryptedJsonStr = atob(body.content);
         const parsedRaw = JSON.parse(encryptedJsonStr);
 
-        // Decrypt AES-256-GCM vault state if encrypted
         this.state = await this.decryptVaultInBrowser(parsedRaw, this.pin);
       }
     } catch (err) {
@@ -283,6 +290,17 @@ class SinchlorStudio {
     this.showToast('Abriendo nueva pestaña para otra sesión simultánea 🔀', 'info');
   }
 
+  enforceRoleCapabilities() {
+    if (this.mode !== 'parade' || !this.currentMember) return;
+
+    const isViewer = this.currentMember.role === 'viewer';
+    
+    // Hide or disable write/create/delete buttons for Viewers
+    document.querySelectorAll('.btn-action-write').forEach(btn => {
+      btn.style.display = isViewer ? 'none' : 'inline-block';
+    });
+  }
+
   renderAll() {
     this.renderDashboard();
     this.renderPetals();
@@ -290,6 +308,7 @@ class SinchlorStudio {
     this.renderTraps();
     this.renderNectar();
     this.renderTeamMembers();
+    this.enforceRoleCapabilities();
   }
 
   renderDashboard() {
@@ -307,13 +326,15 @@ class SinchlorStudio {
       return;
     }
 
+    const isViewer = this.mode === 'parade' && this.currentMember?.role === 'viewer';
+
     tbody.innerHTML = petals.slice(0, 5).map(p => `
       <tr>
         <td><code>sinchlor:${p.alias}</code></td>
         <td><span class="badge badge-crimson">${p.category || 'general'}</span></td>
         <td>
           <button class="btn btn-outline btn-sm" onclick="app.openRevealModal('${p.alias}')">👁️ Revelar</button>
-          <button class="btn btn-outline btn-sm" onclick="app.openEditPetalModal('${p.alias}')">✏️ Editar</button>
+          ${isViewer ? '' : `<button class="btn btn-outline btn-sm" onclick="app.openEditPetalModal('${p.alias}')">✏️ Editar</button>`}
         </td>
       </tr>
     `).join('');
@@ -329,6 +350,8 @@ class SinchlorStudio {
       return;
     }
 
+    const isViewer = this.mode === 'parade' && this.currentMember?.role === 'viewer';
+
     tbody.innerHTML = petals.map(p => `
       <tr>
         <td><code>sinchlor:${p.alias}</code></td>
@@ -337,8 +360,10 @@ class SinchlorStudio {
         <td><span style="font-size: 0.8rem; color: var(--text-muted);">${new Date(p.createdAt || Date.now()).toLocaleDateString()}</span></td>
         <td>
           <button class="btn btn-outline btn-sm" onclick="app.openRevealModal('${p.alias}')">👁️ Revelar</button>
-          <button class="btn btn-outline btn-sm" onclick="app.openEditPetalModal('${p.alias}')">✏️ Editar</button>
-          <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.confirmDeletePetal('${p.alias}')">🗑️</button>
+          ${isViewer ? '' : `
+            <button class="btn btn-outline btn-sm" onclick="app.openEditPetalModal('${p.alias}')">✏️ Editar</button>
+            <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.confirmDeletePetal('${p.alias}')">🗑️</button>
+          `}
         </td>
       </tr>
     `).join('');
@@ -350,10 +375,9 @@ class SinchlorStudio {
 
     if (this.mode === 'parade' && this.currentParade) {
       const p = this.currentParade;
-      // SECURE PARADE DISPLAY (ADMIN KEY HIDDEN FOR SECURITY!)
       box.innerHTML = `
         <strong style="color: var(--accent-magenta); font-size: 1rem;">🎪 Desfile Activo: ${p.name}</strong><br>
-        <span style="font-size: 0.85rem; color: var(--text-muted);">Creador: <strong>${p.adminUser}</strong> • Miembros Registrados: ${Object.keys(p.members || {}).length} • Tu Rol: <strong style="color: var(--accent-green);">${this.currentMember?.role?.toUpperCase()}</strong></span>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Creador: <strong>${p.adminUser}</strong> • Miembros Registrados: ${Object.keys(p.members || {}).length} • Tu Rol: <strong style="color: var(--accent-green);">${this.currentMember?.customIamRole || this.currentMember?.role?.toUpperCase()}</strong></span>
       `;
 
       const logs = p.auditLogs || [];
@@ -382,6 +406,8 @@ class SinchlorStudio {
       return;
     }
 
+    const isViewer = this.mode === 'parade' && this.currentMember?.role === 'viewer';
+
     tbody.innerHTML = traps.map(t => {
       const channels = [];
       if (t.alertChannels?.githubIssue !== false) channels.push(`🐙 Issue (${t.alertChannels?.githubIssueRepo || '.sinchlor-storage'})`);
@@ -398,10 +424,12 @@ class SinchlorStudio {
           <td><span class="badge badge-green">${channels.join(' • ') || 'Nativa'}</span></td>
           <td><span class="badge badge-magenta">${t.triggeredCount || 0} disparos</span></td>
           <td>
-            <button class="btn btn-outline btn-sm" onclick="app.triggerTrap('${t.trapId}')">🔥 Probar</button>
-            <button class="btn btn-outline btn-sm" onclick="app.recreateTrap('${t.trapId}')">🔄 Recrear</button>
-            <button class="btn btn-outline btn-sm" onclick="app.openEditTrapModal('${t.trapId}')">✏️ Editar</button>
-            <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.confirmDeleteTrap('${t.trapId}')">🗑️</button>
+            ${isViewer ? '<span class="badge badge-gold">Solo Lectura</span>' : `
+              <button class="btn btn-outline btn-sm" onclick="app.triggerTrap('${t.trapId}')">🔥 Probar</button>
+              <button class="btn btn-outline btn-sm" onclick="app.recreateTrap('${t.trapId}')">🔄 Recrear</button>
+              <button class="btn btn-outline btn-sm" onclick="app.openEditTrapModal('${t.trapId}')">✏️ Editar</button>
+              <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.confirmDeleteTrap('${t.trapId}')">🗑️</button>
+            `}
           </td>
         </tr>
       `;
@@ -417,6 +445,8 @@ class SinchlorStudio {
       return;
     }
 
+    const isViewer = this.mode === 'parade' && this.currentMember?.role === 'viewer';
+
     tbody.innerHTML = nectars.map(n => `
       <tr>
         <td><code>${n.alias}</code></td>
@@ -429,8 +459,10 @@ class SinchlorStudio {
         <td><span class="badge ${n.used ? 'badge-magenta' : 'badge-green'}">${n.used ? 'Consumido' : 'Disponible'}</span></td>
         <td>
           <button class="btn btn-outline btn-sm" onclick="app.consumeNectar('${n.nectarId}')" ${n.used ? 'disabled' : ''}>🏵️ Consumir</button>
-          <button class="btn btn-outline btn-sm" onclick="app.openEditNectarModal('${n.nectarId}')">✏️ Editar</button>
-          <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.confirmDeleteNectar('${n.nectarId}')">🗑️</button>
+          ${isViewer ? '' : `
+            <button class="btn btn-outline btn-sm" onclick="app.openEditNectarModal('${n.nectarId}')">✏️ Editar</button>
+            <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.confirmDeleteNectar('${n.nectarId}')">🗑️</button>
+          `}
         </td>
       </tr>
     `).join('');
@@ -445,7 +477,7 @@ class SinchlorStudio {
     const members = Object.values(this.currentParade.members || {});
     tbody.innerHTML = members.map(m => {
       const roleBadge = m.customIamRole ?
-        `<span class="badge badge-gold">LUMINA/IAM (${m.customIamRole})</span>` :
+        `<span class="badge badge-gold">${m.provider === 'aws_iam' ? 'AWS IAM' : 'LUMINA'} (${m.customIamRole})</span>` :
         `<span class="badge badge-magenta">${m.role.toUpperCase()}</span>`;
 
       return `
@@ -462,25 +494,76 @@ class SinchlorStudio {
     }).join('');
   }
 
+  toggleRoleProviderFields(prefix = 'invite') {
+    const provider = document.getElementById(`${prefix}-role-provider`).value;
+    document.getElementById(`${prefix}-group-native`).style.display = provider === 'sinchlor_native' ? 'block' : 'none';
+    document.getElementById(`${prefix}-group-aws`).style.display = provider === 'aws_iam' ? 'block' : 'none';
+    document.getElementById(`${prefix}-group-lumina`).style.display = provider === 'lumina_role' ? 'block' : 'none';
+    document.getElementById(`${prefix}-group-custom`).style.display = provider === 'custom_json' ? 'block' : 'none';
+
+    const defaultJson = JSON.stringify({
+      Version: '2026-08-03',
+      Statement: [
+        {
+          Effect: 'Allow',
+          Action: [
+            'sinchlor:petals:read',
+            'sinchlor:petals:reveal',
+            'sinchlor:nectar:consume',
+            'sinchlor:petals:write',
+            'sinchlor:traps:trigger'
+          ],
+          Resource: '*'
+        }
+      ]
+    }, null, 2);
+
+    if (provider === 'aws_iam' && !document.getElementById(`${prefix}-aws-json`).value) {
+      document.getElementById(`${prefix}-aws-json`).value = defaultJson;
+    }
+    if (provider === 'custom_json' && !document.getElementById(`${prefix}-custom-json`).value) {
+      document.getElementById(`${prefix}-custom-json`).value = defaultJson;
+    }
+  }
+
   // 🎪 PARADE MEMBER MANAGEMENT
   handleInviteMember(e) {
     e.preventDefault();
     const userName = document.getElementById('invite-user-name').value.trim();
-    const nativeRole = document.getElementById('invite-role').value;
-    const enableIam = document.getElementById('invite-enable-iam').checked;
-    const iamRole = document.getElementById('invite-iam-role').value.trim();
+    const provider = document.getElementById('invite-role-provider').value;
+
+    let role = 'viewer';
+    let customIamRole = undefined;
+
+    if (provider === 'sinchlor_native') {
+      role = document.getElementById('invite-native-role').value;
+    } else if (provider === 'aws_iam') {
+      role = 'custom_iam';
+      const roleName = document.getElementById('invite-aws-role-name').value.trim();
+      customIamRole = `aws:iam:${roleName || 'Role-Sinchlor-DevOps'}`;
+    } else if (provider === 'lumina_role') {
+      role = 'custom_iam';
+      customIamRole = document.getElementById('invite-lumina-arn').value.trim() || 'lumina:role:developer';
+    } else if (provider === 'custom_json') {
+      role = 'custom_iam';
+      customIamRole = 'sinchlor:policy:declarative';
+      if (document.getElementById('invite-export-lumina').checked) {
+        this.showToast('🔮 Política declarativa exportada exitosamente a Lumina Security Suite!', 'info');
+      }
+    }
 
     if (!this.currentParade) return;
 
     const userId = `user_${Date.now().toString(36)}`;
-    const paradeKey = `parade_key_${nativeRole}_${Math.random().toString(36).slice(2, 10)}`;
+    const paradeKey = `parade_key_${role}_${Math.random().toString(36).slice(2, 10)}`;
 
     const newMember = {
       userId,
       name: userName,
       paradeKey,
-      role: enableIam ? 'custom_iam' : nativeRole,
-      customIamRole: enableIam ? iamRole : undefined,
+      role,
+      provider,
+      customIamRole,
       createdAt: new Date().toISOString()
     };
 
@@ -499,15 +582,16 @@ class SinchlorStudio {
     document.getElementById('edit-member-id').value = userId;
     document.getElementById('edit-member-name').value = m.name;
 
-    if (m.customIamRole) {
-      document.getElementById('edit-member-enable-iam').checked = true;
-      document.getElementById('edit-member-iam-role').disabled = false;
-      document.getElementById('edit-member-iam-role').value = m.customIamRole;
-    } else {
-      document.getElementById('edit-member-enable-iam').checked = false;
-      document.getElementById('edit-member-iam-role').disabled = true;
-      document.getElementById('edit-member-iam-role').value = '';
-      document.getElementById('edit-member-role').value = m.role || 'viewer';
+    const provider = m.provider || (m.customIamRole ? 'lumina_role' : 'sinchlor_native');
+    document.getElementById('edit-role-provider').value = provider;
+    this.toggleRoleProviderFields('edit');
+
+    if (provider === 'sinchlor_native') {
+      document.getElementById('edit-native-role').value = m.role || 'viewer';
+    } else if (provider === 'lumina_role') {
+      document.getElementById('edit-lumina-arn').value = m.customIamRole || 'lumina:role:developer';
+    } else if (provider === 'aws_iam') {
+      document.getElementById('edit-aws-role-name').value = m.customIamRole?.replace(/^aws:iam:/, '') || 'Role-Sinchlor-DevOps';
     }
 
     this.openModal('edit-member-modal');
@@ -517,21 +601,34 @@ class SinchlorStudio {
     e.preventDefault();
     const userId = document.getElementById('edit-member-id').value;
     const name = document.getElementById('edit-member-name').value.trim();
-    const nativeRole = document.getElementById('edit-member-role').value;
-    const enableIam = document.getElementById('edit-member-enable-iam').checked;
-    const iamRole = document.getElementById('edit-member-iam-role').value.trim();
+    const provider = document.getElementById('edit-role-provider').value;
+
+    let role = 'viewer';
+    let customIamRole = undefined;
+
+    if (provider === 'sinchlor_native') {
+      role = document.getElementById('edit-native-role').value;
+    } else if (provider === 'aws_iam') {
+      role = 'custom_iam';
+      const roleName = document.getElementById('edit-aws-role-name').value.trim();
+      customIamRole = `aws:iam:${roleName || 'Role-Sinchlor-DevOps'}`;
+    } else if (provider === 'lumina_role') {
+      role = 'custom_iam';
+      customIamRole = document.getElementById('edit-lumina-arn').value.trim() || 'lumina:role:developer';
+    } else if (provider === 'custom_json') {
+      role = 'custom_iam';
+      customIamRole = 'sinchlor:policy:declarative';
+      if (document.getElementById('edit-export-lumina').checked) {
+        this.showToast('🔮 Política declarativa exportada a Lumina Security Suite!', 'info');
+      }
+    }
 
     if (this.currentParade && this.currentParade.members[userId]) {
       const m = this.currentParade.members[userId];
       m.name = name;
-
-      if (enableIam && iamRole) {
-        m.role = 'custom_iam';
-        m.customIamRole = iamRole;
-      } else {
-        m.role = nativeRole;
-        delete m.customIamRole;
-      }
+      m.role = role;
+      m.provider = provider;
+      m.customIamRole = customIamRole;
 
       this.closeModal('edit-member-modal');
       this.showToast(`Miembro '${name}' modificado con éxito. ✏️`, 'success');
@@ -875,7 +972,6 @@ class SinchlorStudio {
     this.renderAll();
   }
 
-  // REST OF METHODS
   handleCreateNectar(e) {
     e.preventDefault();
     const alias = document.getElementById('nectar-alias').value.trim();

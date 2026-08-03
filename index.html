@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🛡️ SINCHLOR Studio — Secrets Camouflage & Credentials Engine</title>
+  <title>SINCHLOR Studio — Secrets Camouflage & Credentials Engine</title>
   <link rel="icon" type="image/png" href="assets/logo_sinchlor.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -42,7 +42,7 @@
           <input type="text" id="parade-name-input" placeholder="Sinclor Dev Enjambre" required>
         </div>
         <div class="form-group">
-          <label for="parade-key-input">Parade Access Key O GitHub PAT (O ambos)</label>
+          <label for="parade-key-input">Parade Access Key O GitHub PAT (O formato PAT:ParadeKey)</label>
           <input type="password" id="parade-key-input" placeholder="parade_key_•••••••• o ghp_••••••••" required>
         </div>
         <button type="submit" class="btn btn-accent btn-block">Entrar al Desfile de Equipo 🎪</button>
@@ -105,7 +105,7 @@
 
     <!-- MAIN CONTENT AREA -->
     <main class="main-content">
-      <!-- TOPBAR (ONLY SYNCHRONIZE BUTTON NOW) -->
+      <!-- TOPBAR (ONLY SYNCHRONIZE BUTTON) -->
       <header class="topbar">
         <div class="topbar-title">
           <h1 id="header-title">📊 Dashboard de Recursos & Acceso Rápido</h1>
@@ -149,9 +149,9 @@
             <h3>⚡ Accesos Rápidos</h3>
           </div>
           <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-            <button class="btn btn-primary" onclick="app.openModal('create-petal-modal')">🌺 Nuevo Pétalo Semántico</button>
-            <button class="btn btn-outline" onclick="app.openModal('create-trap-modal')">🌸 Plantar PetalTrap</button>
-            <button class="btn btn-outline" onclick="app.openModal('create-nectar-modal')">🏵️ Emitir Néctar Efímero</button>
+            <button class="btn btn-primary btn-action-write" onclick="app.openModal('create-petal-modal')">🌺 Nuevo Pétalo Semántico</button>
+            <button class="btn btn-outline btn-action-write" onclick="app.openModal('create-trap-modal')">🌸 Plantar PetalTrap</button>
+            <button class="btn btn-outline btn-action-write" onclick="app.openModal('create-nectar-modal')">🏵️ Emitir Néctar Efímero</button>
             <button class="btn btn-outline" onclick="app.switchTab('petalshield')">🛡️ Escanear Código (PetalShield)</button>
           </div>
         </div>
@@ -208,7 +208,7 @@
         <div class="card glass-panel" style="margin-top: 1.5rem;">
           <div class="card-header">
             <h3>🌺 Catálogo de Pétalos (Aliases)</h3>
-            <button class="btn btn-primary btn-sm" onclick="app.openModal('create-petal-modal')">➕ Nuevo Pétalo</button>
+            <button class="btn btn-primary btn-sm btn-action-write" onclick="app.openModal('create-petal-modal')">➕ Nuevo Pétalo</button>
           </div>
           <div class="table-responsive">
             <table class="data-table">
@@ -237,7 +237,7 @@
             <span class="badge badge-magenta" id="parade-role-badge">Miembro</span>
           </div>
           <div id="parade-info-box" style="padding: 1rem; background: rgba(192, 38, 211, 0.08); border-left: 3px solid var(--accent-magenta); border-radius: 8px; margin-bottom: 1.5rem;">
-            <!-- Parade Info (Clave Oculta por Seguridad) -->
+            <!-- Parade Info (Sin mostrar claves en texto plano) -->
           </div>
 
           <h4 style="margin-bottom: 0.75rem;">📊 Auditoría de Accesos y Uso del Equipo</h4>
@@ -288,7 +288,7 @@
         <div class="card glass-panel">
           <div class="card-header">
             <h3>🌸 PetalTraps (Honeytokens / Trampas de Camuflaje)</h3>
-            <button class="btn btn-outline btn-sm" onclick="app.openModal('create-trap-modal')">➕ Crear Trampa 🌸</button>
+            <button class="btn btn-outline btn-sm btn-action-write" onclick="app.openModal('create-trap-modal')">➕ Crear Trampa 🌸</button>
           </div>
           <div class="table-responsive">
             <table class="data-table">
@@ -315,7 +315,7 @@
         <div class="card glass-panel">
           <div class="card-header">
             <h3>🏵️ Néctar Efímero (Credenciales TTL & 1-Solo Uso)</h3>
-            <button class="btn btn-outline btn-sm" onclick="app.openModal('create-nectar-modal')">➕ Emitir Néctar 🏵️</button>
+            <button class="btn btn-outline btn-sm btn-action-write" onclick="app.openModal('create-nectar-modal')">➕ Emitir Néctar 🏵️</button>
           </div>
           <div class="table-responsive">
             <table class="data-table">
@@ -346,7 +346,7 @@
 
           <div style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(16, 185, 129, 0.08); border-left: 3px solid var(--accent-green); border-radius: 8px;">
             <p style="color: var(--accent-green); margin: 0; font-size: 0.9rem;">
-              🔑 <strong>Panel del Administrador de la Parade</strong>: Puedes crear, modificar y editar miembros, asignando Roles Nativos o Roles Avanzados Lumina / AWS IAM de forma mutuamente exclusiva.
+              🔑 <strong>Panel del Administrador de la Parade</strong>: Puedes crear, modificar y editar miembros, asignando Roles Nativos, AWS IAM Policies o Lumina Security Roles.
             </p>
           </div>
 
@@ -355,7 +355,7 @@
               <thead>
                 <tr>
                   <th>Usuario</th>
-                  <th>Rol Asignado</th>
+                  <th>Rol / Política Asignada</th>
                   <th>Parade Access Key</th>
                   <th>Acciones</th>
                 </tr>
@@ -468,7 +468,7 @@
             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
               <input type="checkbox" id="trap-enable-github" checked style="width: auto;"> 🐙 GitHub Issue Alert
             </label>
-            <input type="text" id="trap-github-repo" value="amglogicalis/.sinchlor-storage" placeholder="Repo para crear la Issue (ej: amglogicalis/mi-app)" style="margin-top: 0.3rem;">
+            <input type="text" id="trap-github-repo" value="amglogicalis/.sinchlor-storage" placeholder="Repo para crear la Issue" style="margin-top: 0.3rem;">
           </div>
 
           <div class="form-group">
@@ -583,9 +583,9 @@
     </div>
   </div>
 
-  <!-- MODAL: INVITE MEMBER (ADMIN ONLY - MUTUALLY EXCLUSIVE ROLES) -->
+  <!-- MODAL: INVITE MEMBER (ADMIN ONLY - MULTI-PROVIDER POLICY SYSTEM) -->
   <div id="invite-member-modal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 540px;">
       <div class="modal-header">
         <h3>🎪 Invitar Miembro al Sinchlor Parade</h3>
         <button class="close-btn" onclick="app.closeModal('invite-member-modal')">&times;</button>
@@ -596,24 +596,58 @@
           <input type="text" id="invite-user-name" placeholder="Carlos Frontend" required>
         </div>
         
-        <div style="border-top: 1px solid var(--border); padding-top: 0.75rem; margin-top: 0.75rem;">
-          <h4 style="margin-bottom: 0.5rem; font-size: 0.9rem; color: var(--accent-magenta);">Opción A: Rol Nativo Sinchlor</h4>
+        <div class="form-group">
+          <label for="invite-role-provider">Proveedor / Modelo de Permisos</label>
+          <select id="invite-role-provider" onchange="app.toggleRoleProviderFields('invite')" style="background: #0d1117; color: #fff; border: 1px solid var(--border);">
+            <option value="sinchlor_native">1. Rol Nativo Sinchlor (Viewer / Editor / Admin)</option>
+            <option value="aws_iam">2. AWS Custom IAM Policy Document</option>
+            <option value="lumina_role">3. Lumina Security Suite Role ARN</option>
+            <option value="custom_json">4. Política Declarativa Personalizada Sinchlor</option>
+          </select>
+        </div>
+
+        <!-- PROVIDER 1: NATIVE ROLES -->
+        <div id="invite-group-native" class="provider-field-group">
           <div class="form-group">
-            <select id="invite-role" style="background: #0d1117; color: #fff; border: 1px solid var(--border);">
-              <option value="editor">Editor (Crear / Editar)</option>
-              <option value="viewer">Viewer (Solo Lectura)</option>
-              <option value="admin">Admin (Control Total)</option>
+            <label for="invite-native-role">Rol Nativo Asignado</label>
+            <select id="invite-native-role" style="background: #0d1117; color: #fff; border: 1px solid var(--border);">
+              <option value="viewer">Viewer (Ver, Revelar y Consumir Néctar)</option>
+              <option value="editor">Editor (Ver, Revelar, Consumir, Crear, Editar, Eliminar, Probar)</option>
+              <option value="admin">Admin (Control Total + Gestión de Equipo)</option>
             </select>
           </div>
         </div>
 
-        <div style="border-top: 1px solid var(--border); padding-top: 0.75rem; margin-top: 0.75rem;">
-          <h4 style="margin-bottom: 0.5rem; font-size: 0.9rem; color: var(--accent-gold);">Opción B: Permisos Avanzados / Rol Lumina u IAM (Sustituye Rol Nativo)</h4>
+        <!-- PROVIDER 2: AWS IAM POLICY -->
+        <div id="invite-group-aws" class="provider-field-group" style="display: none;">
           <div class="form-group">
-            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin-bottom: 0.3rem;">
-              <input type="checkbox" id="invite-enable-iam" style="width: auto;" onchange="document.getElementById('invite-iam-role').disabled = !this.checked;"> Usar Rol Lumina / AWS IAM
+            <label for="invite-aws-role-name">Nombre / ID del Rol de AWS IAM</label>
+            <input type="text" id="invite-aws-role-name" placeholder="Role-Sinchlor-DevOps">
+          </div>
+          <div class="form-group">
+            <label for="invite-aws-json">Documento de Política JSON para AWS IAM</label>
+            <textarea id="invite-aws-json" rows="6" style="font-family: monospace; font-size: 0.8rem;"></textarea>
+          </div>
+        </div>
+
+        <!-- PROVIDER 3: LUMINA ROLE ARN -->
+        <div id="invite-group-lumina" class="provider-field-group" style="display: none;">
+          <div class="form-group">
+            <label for="invite-lumina-arn">Lumina Role ARN / ID</label>
+            <input type="text" id="invite-lumina-arn" placeholder="lumina:role:developer o lumina:role:38192">
+          </div>
+        </div>
+
+        <!-- PROVIDER 4: CUSTOM JSON POLICY + EXPORT TO LUMINA -->
+        <div id="invite-group-custom" class="provider-field-group" style="display: none;">
+          <div class="form-group">
+            <label for="invite-custom-json">Política Declarativa JSON</label>
+            <textarea id="invite-custom-json" rows="6" style="font-family: monospace; font-size: 0.8rem;"></textarea>
+          </div>
+          <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="checkbox" id="invite-export-lumina" style="width: auto;"> 🔮 Exportar esta política a Lumina Security Suite
             </label>
-            <input type="text" id="invite-iam-role" disabled placeholder="arn:aws:iam::123456789012:role/DevOps o lumina:role:dev">
           </div>
         </div>
 
@@ -627,7 +661,7 @@
 
   <!-- MODAL: EDIT MEMBER -->
   <div id="edit-member-modal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 540px;">
       <div class="modal-header">
         <h3>✏️ Modificar Miembro del Parade</h3>
         <button class="close-btn" onclick="app.closeModal('edit-member-modal')">&times;</button>
@@ -639,24 +673,58 @@
           <input type="text" id="edit-member-name" required>
         </div>
 
-        <div style="border-top: 1px solid var(--border); padding-top: 0.75rem; margin-top: 0.75rem;">
-          <h4 style="margin-bottom: 0.5rem; font-size: 0.9rem; color: var(--accent-magenta);">Opción A: Rol Nativo Sinchlor</h4>
+        <div class="form-group">
+          <label for="edit-role-provider">Proveedor / Modelo de Permisos</label>
+          <select id="edit-role-provider" onchange="app.toggleRoleProviderFields('edit')" style="background: #0d1117; color: #fff; border: 1px solid var(--border);">
+            <option value="sinchlor_native">1. Rol Nativo Sinchlor (Viewer / Editor / Admin)</option>
+            <option value="aws_iam">2. AWS Custom IAM Policy Document</option>
+            <option value="lumina_role">3. Lumina Security Suite Role ARN</option>
+            <option value="custom_json">4. Política Declarativa Personalizada Sinchlor</option>
+          </select>
+        </div>
+
+        <!-- PROVIDER 1: NATIVE ROLES -->
+        <div id="edit-group-native" class="provider-field-group">
           <div class="form-group">
-            <select id="edit-member-role" style="background: #0d1117; color: #fff; border: 1px solid var(--border);">
-              <option value="editor">Editor (Crear / Editar)</option>
-              <option value="viewer">Viewer (Solo Lectura)</option>
-              <option value="admin">Admin (Control Total)</option>
+            <label for="edit-native-role">Rol Nativo Asignado</label>
+            <select id="edit-native-role" style="background: #0d1117; color: #fff; border: 1px solid var(--border);">
+              <option value="viewer">Viewer (Ver, Revelar y Consumir Néctar)</option>
+              <option value="editor">Editor (Ver, Revelar, Consumir, Crear, Editar, Eliminar, Probar)</option>
+              <option value="admin">Admin (Control Total + Gestión de Equipo)</option>
             </select>
           </div>
         </div>
 
-        <div style="border-top: 1px solid var(--border); padding-top: 0.75rem; margin-top: 0.75rem;">
-          <h4 style="margin-bottom: 0.5rem; font-size: 0.9rem; color: var(--accent-gold);">Opción B: Permisos Avanzados / Rol Lumina u IAM</h4>
+        <!-- PROVIDER 2: AWS IAM POLICY -->
+        <div id="edit-group-aws" class="provider-field-group" style="display: none;">
           <div class="form-group">
-            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin-bottom: 0.3rem;">
-              <input type="checkbox" id="edit-member-enable-iam" style="width: auto;" onchange="document.getElementById('edit-member-iam-role').disabled = !this.checked;"> Usar Rol Lumina / AWS IAM
+            <label for="edit-aws-role-name">Nombre / ID del Rol de AWS IAM</label>
+            <input type="text" id="edit-aws-role-name" placeholder="Role-Sinchlor-DevOps">
+          </div>
+          <div class="form-group">
+            <label for="edit-aws-json">Documento de Política JSON para AWS IAM</label>
+            <textarea id="edit-aws-json" rows="6" style="font-family: monospace; font-size: 0.8rem;"></textarea>
+          </div>
+        </div>
+
+        <!-- PROVIDER 3: LUMINA ROLE ARN -->
+        <div id="edit-group-lumina" class="provider-field-group" style="display: none;">
+          <div class="form-group">
+            <label for="edit-lumina-arn">Lumina Role ARN / ID</label>
+            <input type="text" id="edit-lumina-arn" placeholder="lumina:role:developer">
+          </div>
+        </div>
+
+        <!-- PROVIDER 4: CUSTOM JSON POLICY + EXPORT TO LUMINA -->
+        <div id="edit-group-custom" class="provider-field-group" style="display: none;">
+          <div class="form-group">
+            <label for="edit-custom-json">Política Declarativa JSON</label>
+            <textarea id="edit-custom-json" rows="6" style="font-family: monospace; font-size: 0.8rem;"></textarea>
+          </div>
+          <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="checkbox" id="edit-export-lumina" style="width: auto;"> 🔮 Exportar esta política a Lumina Security Suite
             </label>
-            <input type="text" id="edit-member-iam-role" disabled placeholder="arn:aws:iam::123:role/DevOps o lumina:role:dev">
           </div>
         </div>
 
