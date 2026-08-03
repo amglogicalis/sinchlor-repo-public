@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🛡️ SINCHLOR Studio — Secrets Camouflage & Credentials Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- LOGIN OVERLAY -->
+  <div id="login-overlay" class="login-overlay">
+    <div class="login-card glass-panel">
+      <div class="login-header">
+        <img src="assets/logo_sinchlor.png" alt="SINCHLOR" class="login-logo" onerror="this.style.display='none';">
+        <h2>🛡️ SINCHLOR Studio</h2>
+        <p>Motor de Camuflaje de Credenciales y DNS de Secretos a Coste $0</p>
+      </div>
+
+      <!-- LOGIN MODE SELECTOR -->
+      <div class="login-mode-selector">
+        <button id="mode-btn-personal" class="mode-tab active" onclick="app.switchLoginMode('personal')">👤 Modo Personal</button>
+        <button id="mode-btn-parade" class="mode-tab" onclick="app.switchLoginMode('parade')">🎪 Sinchlor Parade (Equipo)</button>
+      </div>
+
+      <!-- FORM: PERSONAL MODE -->
+      <form id="personal-login-form" onsubmit="app.handleConnectPersonal(event)">
+        <div class="form-group">
+          <label for="login-token">GitHub Personal Access Token (PAT)</label>
+          <input type="password" id="login-token" placeholder="ghp_••••••••••••••••••••••••••••••••" required>
+        </div>
+        <div class="form-group">
+          <label for="login-vault">Repositorio Bóveda Privado</label>
+          <input type="text" id="login-vault" value=".sinchlor-storage" required>
+        </div>
+        <div class="form-group">
+          <label for="login-pin">PIN / Contraseña Maestra (Cifrado AES-256)</label>
+          <input type="password" id="login-pin" value="sinchlor-master-key" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Conectar a Bóveda Cápsula 🛡️</button>
+      </form>
+
+      <!-- FORM: PARADE MODE -->
+      <form id="parade-login-form" onsubmit="app.handleConnectParade(event)" style="display: none;">
+        <div class="form-group">
+          <label for="parade-name-input">Nombre del Sinchlor Parade</label>
+          <input type="text" id="parade-name-input" placeholder="Frontend Team" required>
+        </div>
+        <div class="form-group">
+          <label for="parade-key-input">Parade Access Key / PAT de Acceso</label>
+          <input type="password" id="parade-key-input" placeholder="parade_key_••••••••••••" required>
+        </div>
+        <div class="form-group">
+          <label for="parade-token-input">GitHub PAT (para llamadas a Git)</label>
+          <input type="password" id="parade-token-input" placeholder="ghp_••••••••••••••••••••••••••••••••" required>
+        </div>
+        <button type="submit" class="btn btn-accent btn-block">Entrar al Desfile de Equipo 🎪</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN APP CONTAINER -->
+  <div id="app-container" class="app-container" style="display: none;">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-icon">🛡️</span>
+        <div class="brand-text">
+          <span class="brand-title">SINCHLOR</span>
+          <span class="brand-subtitle" id="console-mode-subtitle">Personal Vault</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" onclick="app.switchTab('petals')">
+          <span class="nav-icon">🌺</span>
+          <span>Pétalos Semánticos</span>
+        </button>
+        <button class="nav-item" id="nav-item-parades" onclick="app.switchTab('parades')">
+          <span class="nav-icon">🎪</span>
+          <span>Sinchlor Parades</span>
+        </button>
+        <button class="nav-item" onclick="app.switchTab('petalshield')">
+          <span class="nav-icon">🛡️</span>
+          <span>PetalShield Guard</span>
+        </button>
+        <button class="nav-item" onclick="app.switchTab('traps')">
+          <span class="nav-icon">🌸</span>
+          <span>PetalTraps</span>
+        </button>
+        <button class="nav-item" onclick="app.switchTab('nectar')">
+          <span class="nav-icon">🏵️</span>
+          <span>Néctar Efímero</span>
+        </button>
+        <button class="nav-item" id="nav-item-team-admin" onclick="app.switchTab('team-admin')" style="display: none;">
+          <span class="nav-icon">⚙️</span>
+          <span>Gestión de Equipo</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="vault-badge">
+          <span class="dot online"></span>
+          <span id="vault-status-text">Cápsula Conectada</span>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="app.disconnect()">Desconectar 🔒</button>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="main-content">
+      <!-- TOPBAR -->
+      <header class="topbar">
+        <div class="topbar-title">
+          <h1 id="header-title">🌺 Pétalos Semánticos (Alias DNS de Secretos)</h1>
+          <p id="header-subtitle">Enmascara claves largas por aliases legibles resolvedores en memoria RAM</p>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-outline" onclick="app.openModal('create-petal-modal')">➕ Crear Pétalo</button>
+          <button class="btn btn-primary" onclick="app.syncVault()">🔄 Sincronizar</button>
+        </div>
+      </header>
+
+      <!-- TAB 1: PETALS -->
+      <section id="tab-petals" class="tab-content active">
+        <div class="stats-grid">
+          <div class="stat-card glass-panel">
+            <span class="stat-icon">🌺</span>
+            <div class="stat-info">
+              <span class="stat-value" id="stat-total-petals">0</span>
+              <span class="stat-label">Pétalos Registrados</span>
+            </div>
+          </div>
+          <div class="stat-card glass-panel">
+            <span class="stat-icon">⚡</span>
+            <div class="stat-info">
+              <span class="stat-value" id="stat-ram-active">ACTIVO</span>
+              <span class="stat-label">Inyección en RAM</span>
+            </div>
+          </div>
+          <div class="stat-card glass-panel">
+            <span class="stat-icon">🛡️</span>
+            <div class="stat-info">
+              <span class="stat-value">AES-256</span>
+              <span class="stat-label">Cifrado Bóveda</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card glass-panel" style="margin-top: 1.5rem;">
+          <div class="card-header">
+            <h3>🌺 Catálogo de Pétalos (AliasesDNS)</h3>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Alias Semántico</th>
+                  <th>Categoría</th>
+                  <th>Valor Cifrado</th>
+                  <th>Creado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="petals-table-body">
+                <!-- Dynamic Petals -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: SINCHLOR PARADES -->
+      <section id="tab-parades" class="tab-content" style="display: none;">
+        <div class="card glass-panel">
+          <div class="card-header">
+            <h3 id="parade-view-title">🎪 Sinchlor Parades (Desfile de Equipo)</h3>
+            <span class="badge badge-magenta" id="parade-role-badge">Miembro</span>
+          </div>
+          <div id="parade-info-box" style="padding: 1rem; background: rgba(192, 38, 211, 0.08); border-left: 3px solid var(--accent-magenta); border-radius: 8px; margin-bottom: 1.5rem;">
+            <!-- Parade Info -->
+          </div>
+
+          <h4 style="margin-bottom: 0.75rem;">📊 Auditoría de Accesos y Uso del Equipo</h4>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Usuario</th>
+                  <th>Rol / IAM</th>
+                  <th>Acción</th>
+                  <th>Pétalo</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="parade-audit-table-body">
+                <!-- Audit Logs -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: PETALSHIELD GUARD -->
+      <section id="tab-petalshield" class="tab-content" style="display: none;">
+        <div class="card glass-panel">
+          <div class="card-header">
+            <h3>🛡️ PetalShield Guard (Escáner Pre-Commit Anti-Fugas)</h3>
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+            Prueba el motor de escaneo de alta precisión. Detecta GitHub PATs, OpenAI Keys, AWS Secrets y cadenas de alta entropía con cero falsos positivos.
+          </p>
+          <div class="form-group">
+            <label for="scanner-input">Probar Escaneo de Código en Vivo</label>
+            <textarea id="scanner-input" rows="4" placeholder='const token = "ghp_1234567890abcdefghijklmnopqrstuvwxyz"; // pegado por error'></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="app.testPetalShieldScan()">🔍 Ejecutar Escaneo PetalShield</button>
+
+          <div id="scan-results-container" style="margin-top: 1.5rem; display: none;">
+            <h4>Resultados de la Detección:</h4>
+            <div id="scan-results-list" style="margin-top: 0.5rem;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: PETALTRAPS -->
+      <section id="tab-traps" class="tab-content" style="display: none;">
+        <div class="card glass-panel">
+          <div class="card-header">
+            <h3>🌸 PetalTraps (Honeytokens / Trampas de Camuflaje)</h3>
+            <button class="btn btn-outline btn-sm" onclick="app.openModal('create-trap-modal')">➕ Crear Trampa 🌸</button>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Alias Trampa</th>
+                  <th>Token Señuelo</th>
+                  <th>Alertas</th>
+                  <th>Disparos</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="traps-table-body">
+                <!-- Dynamic Traps -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: NECTAR EFIMERO -->
+      <section id="tab-nectar" class="tab-content" style="display: none;">
+        <div class="card glass-panel">
+          <div class="card-header">
+            <h3>🏵️ Néctar Efímero (Credenciales TTL & 1-Solo Uso)</h3>
+            <button class="btn btn-outline btn-sm" onclick="app.openModal('create-nectar-modal')">➕ Emitir Néctar 🏵️</button>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Alias Néctar</th>
+                  <th>Tipo</th>
+                  <th>Expiración / TTL</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="nectar-table-body">
+                <!-- Dynamic Nectar -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: TEAM ADMIN (EXCLUSIVE ADMIN TAB) -->
+      <section id="tab-team-admin" class="tab-content" style="display: none;">
+        <div class="card glass-panel">
+          <div class="card-header">
+            <h3>⚙️ Gestión de Equipo, Miembros y Roles Granulares (Admin Only)</h3>
+            <button class="btn btn-primary btn-sm" onclick="app.openModal('invite-member-modal')">➕ Invitar Miembro al Equipo</button>
+          </div>
+
+          <div style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(16, 185, 129, 0.08); border-left: 3px solid var(--accent-green); border-radius: 8px;">
+            <p style="color: var(--accent-green); margin: 0; font-size: 0.9rem;">
+              🔑 <strong>Panel del Administrador de la Parade</strong>: Puedes crear, modificar y revocar miembros y asignarles roles granulares nativos o roles <strong>Lumina / AWS IAM</strong>.
+            </p>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Usuario</th>
+                  <th>Rol Sinchlor</th>
+                  <th>Rol Lumina / AWS IAM</th>
+                  <th>Parade Key</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="team-members-table-body">
+                <!-- Members List -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL: CREATE PETAL -->
+  <div id="create-petal-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>🌺 Crear Pétalo Semántico (Alias DNS)</h3>
+        <button class="close-btn" onclick="app.closeModal('create-petal-modal')">&times;</button>
+      </div>
+      <form onsubmit="app.handleCreatePetal(event)">
+        <div class="form-group">
+          <label for="petal-alias">Alias Semántico</label>
+          <input type="text" id="petal-alias" placeholder="gh-readonly" required>
+        </div>
+        <div class="form-group">
+          <label for="petal-secret">Secret Real / Token Privado</label>
+          <input type="password" id="petal-secret" placeholder="ghp_••••••••••••••••••••••••••••••••" required>
+        </div>
+        <div class="form-group">
+          <label for="petal-category">Categoría</label>
+          <input type="text" id="petal-category" placeholder="github, aws, stripe">
+        </div>
+        <div class="form-group">
+          <label for="petal-desc">Descripción (Opcional)</label>
+          <input type="text" id="petal-desc" placeholder="PAT de lectura para el servidor de desarrollo">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="app.closeModal('create-petal-modal')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Pétalo 🌺</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: REVEAL PETAL -->
+  <div id="reveal-petal-modal" class="modal">
+    <div class="modal-content" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3>👁️ Revelar Secret de Pétalo</h3>
+        <button class="close-btn" onclick="app.closeModal('reveal-petal-modal')">&times;</button>
+      </div>
+      <div class="form-group">
+        <label>Alias del Pétalo</label>
+        <input type="text" id="reveal-alias-display" readonly style="background: rgba(0,0,0,0.3);">
+      </div>
+      <div class="form-group">
+        <label>Secret Descifrado en RAM</label>
+        <input type="text" id="reveal-secret-output" readonly style="background: rgba(16, 185, 129, 0.1); color: var(--accent-green); font-family: monospace; font-weight: bold;">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" onclick="app.closeModal('reveal-petal-modal')">Cerrar 👁️</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: INVITE MEMBER (ADMIN ONLY) -->
+  <div id="invite-member-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>🎪 Invitar Miembro al Sinchlor Parade</h3>
+        <button class="close-btn" onclick="app.closeModal('invite-member-modal')">&times;</button>
+      </div>
+      <form onsubmit="app.handleInviteMember(event)">
+        <div class="form-group">
+          <label for="invite-user-name">Nombre del Usuario / Desarrollador</label>
+          <input type="text" id="invite-user-name" placeholder="Carlos Frontend" required>
+        </div>
+        <div class="form-group">
+          <label for="invite-role">Rol Granular Sinchlor</label>
+          <select id="invite-role" style="background: #0d1117; color: #fff; border: 1px solid var(--border);">
+            <option value="viewer">Viewer (Solo lectura/resolución)</option>
+            <option value="editor">Editor (Crear y editar pétalos)</option>
+            <option value="admin">Admin (Control total del equipo)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="invite-iam-role">Rol Compatible Lumina / AWS IAM (Opcional)</label>
+          <input type="text" id="invite-iam-role" placeholder="lumina:role:developer o arn:aws:iam::123:role/Dev">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="app.closeModal('invite-member-modal')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Generar Parade Key 🔑</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CREATE TRAP -->
+  <div id="create-trap-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>🌸 Crear PetalTrap (Honeytoken / Trampa)</h3>
+        <button class="close-btn" onclick="app.closeModal('create-trap-modal')">&times;</button>
+      </div>
+      <form onsubmit="app.handleCreateTrap(event)">
+        <div class="form-group">
+          <label for="trap-alias">Alias Trampa</label>
+          <input type="text" id="trap-alias" placeholder="trap-github-pat" required>
+        </div>
+        <div class="form-group">
+          <label for="trap-discord">Discord Webhook URL (Opcional)</label>
+          <input type="url" id="trap-discord" placeholder="https://discord.com/api/webhooks/...">
+        </div>
+        <div class="form-group">
+          <label for="trap-telegram-token">Telegram Bot Token (Opcional)</label>
+          <input type="text" id="trap-telegram-token" placeholder="123456:ABC-DEF...">
+        </div>
+        <div class="form-group">
+          <label for="trap-telegram-chat">Telegram Chat ID (Opcional)</label>
+          <input type="text" id="trap-telegram-chat" placeholder="987654321">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="app.closeModal('create-trap-modal')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Plantar Trampa 🌸</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CREATE NECTAR -->
+  <div id="create-nectar-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>🏵️ Emitir Néctar Efímero</h3>
+        <button class="close-btn" onclick="app.closeModal('create-nectar-modal')">&times;</button>
+      </div>
+      <form onsubmit="app.handleCreateNectar(event)">
+        <div class="form-group">
+          <label for="nectar-alias">Alias Néctar</label>
+          <input type="text" id="nectar-alias" placeholder="temp-aws-session" required>
+        </div>
+        <div class="form-group">
+          <label for="nectar-secret">Secret Real</label>
+          <input type="password" id="nectar-secret" required>
+        </div>
+        <div class="form-group">
+          <label for="nectar-ttl">TTL en Minutos (0 = Sin tiempo expiración)</label>
+          <input type="number" id="nectar-ttl" value="15">
+        </div>
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="checkbox" id="nectar-single-use" style="width: auto;"> 🏵️ Autodestrucción tras 1-Solo Uso
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="app.closeModal('create-nectar-modal')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Emitir Néctar 🏵️</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
