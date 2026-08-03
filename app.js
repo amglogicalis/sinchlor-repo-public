@@ -10,6 +10,7 @@ class SinchlorStudio {
     this.paradeKey = '';
     this.currentParade = null;
     this.currentMember = null;
+    this.vaultSha = undefined;
     this.confirmCallback = null;
     this.nectarTimerInterval = null;
     this.state = {
@@ -100,6 +101,49 @@ class SinchlorStudio {
     }
   }
 
+  // RESOURCE ISOLATION HELPERS
+  getActivePetals() {
+    if (this.mode === 'parade' && this.currentParade) {
+      if (!this.currentParade.petals) this.currentParade.petals = {};
+      return this.currentParade.petals;
+    }
+    if (!this.state.petals) this.state.petals = {};
+    return this.state.petals;
+  }
+
+  getActiveTraps() {
+    if (this.mode === 'parade' && this.currentParade) {
+      if (!this.currentParade.traps) this.currentParade.traps = {};
+      return this.currentParade.traps;
+    }
+    if (!this.state.traps) this.state.traps = {};
+    return this.state.traps;
+  }
+
+  getActiveNectars() {
+    if (this.mode === 'parade' && this.currentParade) {
+      if (!this.currentParade.nectars) this.currentParade.nectars = {};
+      return this.currentParade.nectars;
+    }
+    if (!this.state.nectars) this.state.nectars = {};
+    return this.state.nectars;
+  }
+
+  logParadeAction(actionDesc, status = 'success') {
+    if (this.mode === 'parade' && this.currentParade) {
+      if (!this.currentParade.auditLogs) this.currentParade.auditLogs = [];
+      this.currentParade.auditLogs.unshift({
+        logId: `log_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        timestamp: new Date().toISOString(),
+        user: this.currentMember?.name || 'Usuario',
+        role: this.currentMember?.customIamRole || this.currentMember?.role || 'member',
+        action: actionDesc,
+        status
+      });
+      if (this.currentParade.auditLogs.length > 100) this.currentParade.auditLogs.pop();
+    }
+  }
+
   switchLoginMode(mode) {
     this.mode = mode;
     document.getElementById('mode-btn-personal').classList.toggle('active', mode === 'personal');
@@ -125,7 +169,6 @@ class SinchlorStudio {
     this.paradeName = document.getElementById('parade-name-input').value.trim();
     this.paradeKey = document.getElementById('parade-key-input').value.trim();
 
-    // Support PAT:ParadeKey combined format
     let inputPat = '';
     let inputKey = this.paradeKey;
 
@@ -151,7 +194,6 @@ class SinchlorStudio {
       return;
     }
 
-    // Flexible authentication
     let member = Object.values(parade.members || {}).find(
       m => m.paradeKey === inputKey || m.userId === inputKey
     );
@@ -218,6 +260,7 @@ class SinchlorStudio {
 
       if (res.status === 200) {
         const body = await res.json();
+        this.vaultSha = body.sha;
         const encryptedJsonStr = atob(body.content);
         const parsedRaw = JSON.parse(encryptedJsonStr);
 
@@ -225,6 +268,101 @@ class SinchlorStudio {
       }
     } catch (err) {
       console.warn('Could not load remote vault.json:', err);
+    }
+  }
+
+  async saveVaultState(actionDesc = 'Update Vault') {
+    if (!this.token) return;
+
+    this.logParadeAction(actionDesc);
+
+    try {
+      // Get current SHA first
+      const getRes = await fetch(`https://api.github.com/repos/amglogicalis/${this.repo}/contents/vault.json`, {
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+
+      if (getRes.status === 200) {
+        const body = await getRes.json();
+        this.vaultSha = body.sha;
+      }
+
+      const jsonStr = JSON.stringify(this.state);
+      const encodedContent = btoa(jsonStr);
+
+      const putRes = await fetch(`https://api.github.com/repos/amglogicalis/${this.repo}/contents/vault.json`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/vnd.github.v3+json'
+        },
+        body: JSON.stringify({
+          message: `🛡️ Sinchlor Vault: ${actionDesc}`,
+          content: encodedContent,
+          sha: this.vaultSha
+        })
+      });
+
+      if (putRes.status === 200 || putRes.status === 201) {
+        const body = await putRes.json();
+        this.vaultSha = body.content?.sha;
+        this.showToast('💾 Cambios guardados remotamente en GitHub.', 'success');
+      }
+    } catch (err) {
+      console.warn('Error saving vault state:', err);
+    }
+  }
+
+  async exportPolicyToLumina(policyName, policyJson, sanctName = 'default') {
+    if (!this.token) return;
+    try {
+      this.showToast(`🔮 Exportando política '${policyName}' a Lumina (${sanctName})...`, 'info');
+      
+      let sha = undefined;
+      const getRes = await fetch(`https://api.github.com/repos/amglogicalis/.lumina-storage/contents/vault.json`, {
+        headers: { 'Authorization': `Bearer ${this.token}`, 'Accept': 'application/vnd.github.v3+json' }
+      });
+      if (getRes.status === 200) {
+        const b = await getRes.json();
+        sha = b.sha;
+      }
+
+      const luminaState = {
+        version: '1.1.0',
+        sancts: {
+          [sanctName]: {
+            sanctId: sanctName,
+            name: sanctName,
+            policies: {
+              [policyName]: {
+                policyId: `pol_${Date.now()}`,
+                name: policyName,
+                statements: policyJson.Statement || [],
+                provider: 'terra',
+                createdAt: new Date().toISOString()
+              }
+            }
+          }
+        }
+      };
+
+      await fetch(`https://api.github.com/repos/amglogicalis/.lumina-storage/contents/vault.json`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `🔮 Lumina Policy: Export ${policyName} from Sinchlor`,
+          content: btoa(JSON.stringify(luminaState, null, 2)),
+          sha
+        })
+      });
+
+      this.showToast(`✅ Política exportada a Lumina (Sanct: ${sanctName})!`, 'success');
+    } catch (err) {
+      console.warn('Export to Lumina error:', err);
     }
   }
 
@@ -295,7 +433,7 @@ class SinchlorStudio {
 
     const isViewer = this.currentMember.role === 'viewer';
     
-    // Hide or disable write/create/delete buttons for Viewers
+    // Hide write/create buttons for Viewers
     document.querySelectorAll('.btn-action-write').forEach(btn => {
       btn.style.display = isViewer ? 'none' : 'inline-block';
     });
@@ -312,9 +450,9 @@ class SinchlorStudio {
   }
 
   renderDashboard() {
-    const petals = Object.values(this.state.petals || {});
-    const traps = Object.values(this.state.traps || {});
-    const nectars = Object.values(this.state.nectars || {});
+    const petals = Object.values(this.getActivePetals());
+    const traps = Object.values(this.getActiveTraps());
+    const nectars = Object.values(this.getActiveNectars());
 
     document.getElementById('dash-stat-petals').textContent = petals.length;
     document.getElementById('dash-stat-traps').textContent = traps.length;
@@ -342,7 +480,7 @@ class SinchlorStudio {
 
   renderPetals() {
     const tbody = document.getElementById('petals-table-body');
-    const petals = Object.values(this.state.petals || {});
+    const petals = Object.values(this.getActivePetals());
     document.getElementById('stat-total-petals').textContent = petals.length;
 
     if (petals.length === 0) {
@@ -399,7 +537,7 @@ class SinchlorStudio {
 
   renderTraps() {
     const tbody = document.getElementById('traps-table-body');
-    const traps = Object.values(this.state.traps || {});
+    const traps = Object.values(this.getActiveTraps());
 
     if (traps.length === 0) {
       tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Sin PetalTraps 🌸 sembradas.</td></tr>`;
@@ -438,7 +576,7 @@ class SinchlorStudio {
 
   renderNectar() {
     const tbody = document.getElementById('nectar-table-body');
-    const nectars = Object.values(this.state.nectars || {});
+    const nectars = Object.values(this.getActiveNectars());
 
     if (nectars.length === 0) {
       tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Sin Néctar Efímero 🏵️ emitido.</td></tr>`;
@@ -500,34 +638,10 @@ class SinchlorStudio {
     document.getElementById(`${prefix}-group-aws`).style.display = provider === 'aws_iam' ? 'block' : 'none';
     document.getElementById(`${prefix}-group-lumina`).style.display = provider === 'lumina_role' ? 'block' : 'none';
     document.getElementById(`${prefix}-group-custom`).style.display = provider === 'custom_json' ? 'block' : 'none';
-
-    const defaultJson = JSON.stringify({
-      Version: '2026-08-03',
-      Statement: [
-        {
-          Effect: 'Allow',
-          Action: [
-            'sinchlor:petals:read',
-            'sinchlor:petals:reveal',
-            'sinchlor:nectar:consume',
-            'sinchlor:petals:write',
-            'sinchlor:traps:trigger'
-          ],
-          Resource: '*'
-        }
-      ]
-    }, null, 2);
-
-    if (provider === 'aws_iam' && !document.getElementById(`${prefix}-aws-json`).value) {
-      document.getElementById(`${prefix}-aws-json`).value = defaultJson;
-    }
-    if (provider === 'custom_json' && !document.getElementById(`${prefix}-custom-json`).value) {
-      document.getElementById(`${prefix}-custom-json`).value = defaultJson;
-    }
   }
 
   // 🎪 PARADE MEMBER MANAGEMENT
-  handleInviteMember(e) {
+  async handleInviteMember(e) {
     e.preventDefault();
     const userName = document.getElementById('invite-user-name').value.trim();
     const provider = document.getElementById('invite-role-provider').value;
@@ -547,8 +661,18 @@ class SinchlorStudio {
     } else if (provider === 'custom_json') {
       role = 'custom_iam';
       customIamRole = 'sinchlor:policy:declarative';
-      if (document.getElementById('invite-export-lumina').checked) {
-        this.showToast('🔮 Política declarativa exportada exitosamente a Lumina Security Suite!', 'info');
+      
+      const customJsonText = document.getElementById('invite-custom-json').value.trim();
+      const exportLumina = document.getElementById('invite-export-lumina').checked;
+      const sanct = document.getElementById('invite-custom-sanct').value.trim() || 'default';
+
+      if (exportLumina && customJsonText) {
+        try {
+          const parsedPolicy = JSON.parse(customJsonText);
+          await this.exportPolicyToLumina(`sinchlor_pol_${userName.toLowerCase().replace(/\s+/g, '_')}`, parsedPolicy, sanct);
+        } catch {
+          this.showToast('⚠️ JSON de política no válido para exportar a Lumina.', 'error');
+        }
       }
     }
 
@@ -571,6 +695,7 @@ class SinchlorStudio {
     this.currentParade.members[userId] = newMember;
 
     this.closeModal('invite-member-modal');
+    await this.saveVaultState(`Invitado miembro ${userName} (${role})`);
     this.showToast(`Miembro '${userName}' invitado! Key: ${paradeKey}`, 'success');
     this.renderAll();
   }
@@ -589,15 +714,15 @@ class SinchlorStudio {
     if (provider === 'sinchlor_native') {
       document.getElementById('edit-native-role').value = m.role || 'viewer';
     } else if (provider === 'lumina_role') {
-      document.getElementById('edit-lumina-arn').value = m.customIamRole || 'lumina:role:developer';
+      document.getElementById('edit-lumina-arn').value = m.customIamRole || '';
     } else if (provider === 'aws_iam') {
-      document.getElementById('edit-aws-role-name').value = m.customIamRole?.replace(/^aws:iam:/, '') || 'Role-Sinchlor-DevOps';
+      document.getElementById('edit-aws-role-name').value = m.customIamRole?.replace(/^aws:iam:/, '') || '';
     }
 
     this.openModal('edit-member-modal');
   }
 
-  handleSaveEditMember(e) {
+  async handleSaveEditMember(e) {
     e.preventDefault();
     const userId = document.getElementById('edit-member-id').value;
     const name = document.getElementById('edit-member-name').value.trim();
@@ -618,8 +743,17 @@ class SinchlorStudio {
     } else if (provider === 'custom_json') {
       role = 'custom_iam';
       customIamRole = 'sinchlor:policy:declarative';
-      if (document.getElementById('edit-export-lumina').checked) {
-        this.showToast('🔮 Política declarativa exportada a Lumina Security Suite!', 'info');
+      const customJsonText = document.getElementById('edit-custom-json').value.trim();
+      const exportLumina = document.getElementById('edit-export-lumina').checked;
+      const sanct = document.getElementById('edit-custom-sanct').value.trim() || 'default';
+
+      if (exportLumina && customJsonText) {
+        try {
+          const parsedPolicy = JSON.parse(customJsonText);
+          await this.exportPolicyToLumina(`sinchlor_pol_${name.toLowerCase().replace(/\s+/g, '_')}`, parsedPolicy, sanct);
+        } catch {
+          this.showToast('⚠️ JSON de política no válido para exportar a Lumina.', 'error');
+        }
       }
     }
 
@@ -631,19 +765,21 @@ class SinchlorStudio {
       m.customIamRole = customIamRole;
 
       this.closeModal('edit-member-modal');
+      await this.saveVaultState(`Modificado miembro ${name}`);
       this.showToast(`Miembro '${name}' modificado con éxito. ✏️`, 'success');
       this.renderAll();
     }
   }
 
-  confirmRemoveMember(userId) {
+  async confirmRemoveMember(userId) {
     const member = this.currentParade?.members[userId];
     if (!member) return;
 
     this.openConfirmModal(
       `¿Seguro que deseas revocar a '${member.name}' del parade?`,
-      () => {
+      async () => {
         delete this.currentParade.members[userId];
+        await this.saveVaultState(`Revocado acceso a ${member.name}`);
         this.showToast(`Acceso revocado a '${member.name}'.`, 'success');
         this.renderAll();
       }
@@ -652,7 +788,8 @@ class SinchlorStudio {
 
   // 🌺 PETAL ACTIONS & EDIT
   openEditPetalModal(alias) {
-    const petal = this.state.petals[alias];
+    const petals = this.getActivePetals();
+    const petal = petals[alias];
     if (!petal) return;
 
     document.getElementById('edit-petal-old-alias').value = alias;
@@ -663,7 +800,7 @@ class SinchlorStudio {
     this.openModal('edit-petal-modal');
   }
 
-  handleSaveEditPetal(e) {
+  async handleSaveEditPetal(e) {
     e.preventDefault();
     const oldAlias = document.getElementById('edit-petal-old-alias').value;
     const newAlias = document.getElementById('edit-petal-alias').value.trim().replace(/^\[?sinchlor:/, '').replace(/\]$/, '');
@@ -671,11 +808,13 @@ class SinchlorStudio {
     const desc = document.getElementById('edit-petal-desc').value.trim();
     const newSecret = document.getElementById('edit-petal-secret').value.trim();
 
-    if (this.state.petals[oldAlias]) {
-      const existing = this.state.petals[oldAlias];
-      delete this.state.petals[oldAlias];
+    const petals = this.getActivePetals();
 
-      this.state.petals[newAlias] = {
+    if (petals[oldAlias]) {
+      const existing = petals[oldAlias];
+      delete petals[oldAlias];
+
+      petals[newAlias] = {
         petalId: existing.petalId,
         alias: newAlias,
         secretValue: newSecret || existing.secretValue,
@@ -686,16 +825,19 @@ class SinchlorStudio {
       };
 
       this.closeModal('edit-petal-modal');
+      await this.saveVaultState(`Modificado pétalo sinchlor:${newAlias}`);
       this.showToast(`Pétalo 'sinchlor:${newAlias}' modificado con éxito. 🌺`, 'success');
       this.renderAll();
     }
   }
 
-  confirmDeletePetal(alias) {
+  async confirmDeletePetal(alias) {
     this.openConfirmModal(
       `¿Deseas eliminar el pétalo semántico 'sinchlor:${alias}'?`,
-      () => {
-        delete this.state.petals[alias];
+      async () => {
+        const petals = this.getActivePetals();
+        delete petals[alias];
+        await this.saveVaultState(`Eliminado pétalo sinchlor:${alias}`);
         this.showToast(`Pétalo 'sinchlor:${alias}' eliminado.`, 'success');
         this.renderAll();
       }
@@ -703,29 +845,34 @@ class SinchlorStudio {
   }
 
   // 🌸 PETALTRAPS ACTIONS
-  triggerTrap(trapId) {
-    const trap = this.state.traps[trapId];
+  async triggerTrap(trapId) {
+    const traps = this.getActiveTraps();
+    const trap = traps[trapId];
     if (!trap) return;
 
     trap.triggeredCount = (trap.triggeredCount || 0) + 1;
     trap.lastTriggeredAt = new Date().toISOString();
 
     const target = trap.targetRepo ? `${trap.targetRepo}/${trap.targetFile || ''}` : (trap.targetFile || '.sinchlor-storage');
+    await this.saveVaultState(`Probada/Disparada PetalTrap ${trap.alias}`);
     this.showToast(`🌸 ALERTA: PetalTrap '${trap.alias}' probada/disparada en ${target}! Disparos: ${trap.triggeredCount}`, 'info');
     this.renderAll();
   }
 
-  recreateTrap(trapId) {
-    const trap = this.state.traps[trapId];
+  async recreateTrap(trapId) {
+    const traps = this.getActiveTraps();
+    const trap = traps[trapId];
     if (!trap) return;
 
     trap.decoyToken = this.generateRealisticDecoy(trap.entityType || 'github');
+    await this.saveVaultState(`Re-creada PetalTrap ${trap.alias}`);
     this.showToast(`🌸 PetalTrap '${trap.alias}' re-creada con nuevo token señuelo.`, 'success');
     this.renderAll();
   }
 
   openEditTrapModal(trapId) {
-    const trap = this.state.traps[trapId];
+    const traps = this.getActiveTraps();
+    const trap = traps[trapId];
     if (!trap) return;
 
     const fullLocation = trap.targetRepo ? `${trap.targetRepo}/${trap.targetFile || ''}` : (trap.targetFile || '');
@@ -747,7 +894,7 @@ class SinchlorStudio {
     this.openModal('edit-trap-modal');
   }
 
-  handleSaveEditTrap(e) {
+  async handleSaveEditTrap(e) {
     e.preventDefault();
     const trapId = document.getElementById('edit-trap-id').value;
     const alias = document.getElementById('edit-trap-alias').value.trim();
@@ -774,12 +921,14 @@ class SinchlorStudio {
     const tgToken = document.getElementById('edit-trap-telegram-token').value.trim();
     const tgChat = document.getElementById('edit-trap-telegram-chat').value.trim();
 
-    if (this.state.traps[trapId]) {
-      this.state.traps[trapId].alias = alias;
-      this.state.traps[trapId].targetRepo = targetRepo;
-      this.state.traps[trapId].targetFile = targetFile;
+    const traps = this.getActiveTraps();
 
-      this.state.traps[trapId].alertChannels = {
+    if (traps[trapId]) {
+      traps[trapId].alias = alias;
+      traps[trapId].targetRepo = targetRepo;
+      traps[trapId].targetFile = targetFile;
+
+      traps[trapId].alertChannels = {
         githubIssue: enableGithub,
         githubIssueRepo: enableGithub ? githubRepo : undefined,
         discordWebhook: enableDiscord ? discordUrl : undefined,
@@ -788,19 +937,22 @@ class SinchlorStudio {
       };
 
       this.closeModal('edit-trap-modal');
+      await this.saveVaultState(`Modificada PetalTrap ${alias}`);
       this.showToast(`PetalTrap '${alias}' modificada con éxito. 🌸`, 'success');
       this.renderAll();
     }
   }
 
-  confirmDeleteTrap(trapId) {
-    const trap = this.state.traps[trapId];
+  async confirmDeleteTrap(trapId) {
+    const traps = this.getActiveTraps();
+    const trap = traps[trapId];
     if (!trap) return;
 
     this.openConfirmModal(
       `¿Deseas eliminar la PetalTrap '${trap.alias}'?`,
-      () => {
-        delete this.state.traps[trapId];
+      async () => {
+        delete traps[trapId];
+        await this.saveVaultState(`Eliminada PetalTrap ${trap.alias}`);
         this.showToast(`PetalTrap '${trap.alias}' eliminada.`, 'success');
         this.renderAll();
       }
@@ -808,8 +960,9 @@ class SinchlorStudio {
   }
 
   // 🏵️ NECTAR EFIMERO ACTIONS
-  consumeNectar(nectarId) {
-    const nectar = this.state.nectars[nectarId];
+  async consumeNectar(nectarId) {
+    const nectars = this.getActiveNectars();
+    const nectar = nectars[nectarId];
     if (!nectar) return;
 
     if (nectar.used) {
@@ -820,6 +973,7 @@ class SinchlorStudio {
     if (nectar.singleUse) {
       nectar.used = true;
       nectar.usedAt = new Date().toISOString();
+      await this.saveVaultState(`Consumido néctar autodestruido ${nectar.alias}`);
       this.showToast(`🏵️ Néctar '${nectar.alias}' consumido: "${nectar.secretValue}" (Autodestruido)`, 'success');
     } else {
       this.showToast(`🏵️ Néctar '${nectar.alias}' obtenido: "${nectar.secretValue}"`, 'info');
@@ -829,7 +983,8 @@ class SinchlorStudio {
   }
 
   openEditNectarModal(nectarId) {
-    const nectar = this.state.nectars[nectarId];
+    const nectars = this.getActiveNectars();
+    const nectar = nectars[nectarId];
     if (!nectar) return;
 
     document.getElementById('edit-nectar-id').value = nectar.nectarId;
@@ -841,7 +996,7 @@ class SinchlorStudio {
     this.openModal('edit-nectar-modal');
   }
 
-  handleSaveEditNectar(e) {
+  async handleSaveEditNectar(e) {
     e.preventDefault();
     const nectarId = document.getElementById('edit-nectar-id').value;
     const alias = document.getElementById('edit-nectar-alias').value.trim();
@@ -850,34 +1005,39 @@ class SinchlorStudio {
     const singleUse = document.getElementById('edit-nectar-single-use').checked;
     const reactivate = document.getElementById('edit-nectar-reactivate').checked;
 
-    if (this.state.nectars[nectarId]) {
-      this.state.nectars[nectarId].alias = alias;
-      this.state.nectars[nectarId].singleUse = singleUse;
+    const nectars = this.getActiveNectars();
 
-      if (secret) this.state.nectars[nectarId].secretValue = secret;
+    if (nectars[nectarId]) {
+      nectars[nectarId].alias = alias;
+      nectars[nectarId].singleUse = singleUse;
+
+      if (secret) nectars[nectarId].secretValue = secret;
       if (ttlMins > 0) {
-        this.state.nectars[nectarId].expiresAt = new Date(Date.now() + ttlMins * 60000).toISOString();
+        nectars[nectarId].expiresAt = new Date(Date.now() + ttlMins * 60000).toISOString();
       }
 
       if (reactivate) {
-        this.state.nectars[nectarId].used = false;
-        delete this.state.nectars[nectarId].usedAt;
+        nectars[nectarId].used = false;
+        delete nectars[nectarId].usedAt;
       }
 
       this.closeModal('edit-nectar-modal');
+      await this.saveVaultState(`Modificado néctar ${alias}`);
       this.showToast(`Néctar '${alias}' modificado con éxito. 🏵️`, 'success');
       this.renderAll();
     }
   }
 
-  confirmDeleteNectar(nectarId) {
-    const nectar = this.state.nectars[nectarId];
+  async confirmDeleteNectar(nectarId) {
+    const nectars = this.getActiveNectars();
+    const nectar = nectars[nectarId];
     if (!nectar) return;
 
     this.openConfirmModal(
       `¿Deseas eliminar el néctar efímero '${nectar.alias}'?`,
-      () => {
-        delete this.state.nectars[nectarId];
+      async () => {
+        delete nectars[nectarId];
+        await this.saveVaultState(`Eliminado néctar ${nectar.alias}`);
         this.showToast(`Néctar '${nectar.alias}' eliminado.`, 'success');
         this.renderAll();
       }
@@ -885,7 +1045,7 @@ class SinchlorStudio {
   }
 
   // 🌺 PETAL CREATION
-  handleCreatePetal(e) {
+  async handleCreatePetal(e) {
     e.preventDefault();
     const alias = document.getElementById('petal-alias').value.trim();
     const secret = document.getElementById('petal-secret').value.trim();
@@ -902,23 +1062,28 @@ class SinchlorStudio {
       createdAt: new Date().toISOString()
     };
 
-    this.state.petals[cleanAlias] = petal;
+    const petals = this.getActivePetals();
+    petals[cleanAlias] = petal;
+
     this.closeModal('create-petal-modal');
+    await this.saveVaultState(`Creado pétalo sinchlor:${cleanAlias}`);
     this.showToast(`Pétalo 'sinchlor:${cleanAlias}' guardado con éxito! 🌺`, 'success');
     this.renderAll();
   }
 
   openRevealModal(alias) {
-    const petal = this.state.petals[alias];
+    const petals = this.getActivePetals();
+    const petal = petals[alias];
     if (!petal) return;
 
+    this.logParadeAction(`Reveló el secreto del pétalo sinchlor:${alias}`);
     document.getElementById('reveal-alias-display').value = `sinchlor:${alias}`;
     document.getElementById('reveal-secret-output').value = petal.secretValue;
     this.openModal('reveal-petal-modal');
   }
 
   // 🌸 PETALTRAP CREATION
-  handleCreateTrap(e) {
+  async handleCreateTrap(e) {
     e.preventDefault();
     const alias = document.getElementById('trap-alias').value.trim();
     const entityType = document.getElementById('trap-entity-type').value;
@@ -966,13 +1131,16 @@ class SinchlorStudio {
       createdAt: new Date().toISOString()
     };
 
-    this.state.traps[trapId] = trap;
+    const traps = this.getActiveTraps();
+    traps[trapId] = trap;
+
     this.closeModal('create-trap-modal');
+    await this.saveVaultState(`Plantada PetalTrap ${cleanAlias}`);
     this.showToast(`PetalTrap '${cleanAlias}' plantada con éxito! 🌸`, 'success');
     this.renderAll();
   }
 
-  handleCreateNectar(e) {
+  async handleCreateNectar(e) {
     e.preventDefault();
     const alias = document.getElementById('nectar-alias').value.trim();
     const secret = document.getElementById('nectar-secret').value.trim();
@@ -995,8 +1163,11 @@ class SinchlorStudio {
       createdAt: now.toISOString()
     };
 
-    this.state.nectars[nectarId] = nectar;
+    const nectars = this.getActiveNectars();
+    nectars[nectarId] = nectar;
+
     this.closeModal('create-nectar-modal');
+    await this.saveVaultState(`Emitido Néctar Efímero ${cleanAlias}`);
     this.showToast(`Néctar Efímero '${cleanAlias}' emitido con éxito! 🏵️`, 'success');
     this.renderAll();
   }

@@ -544,6 +544,39 @@
     </div>
   </div>
 
+  <!-- MODAL: CREATE NECTAR -->
+  <div id="create-nectar-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>🏵️ Emitir Néctar Efímero</h3>
+        <button class="close-btn" onclick="app.closeModal('create-nectar-modal')">&times;</button>
+      </div>
+      <form onsubmit="app.handleCreateNectar(event)">
+        <div class="form-group">
+          <label for="nectar-alias">Alias Néctar</label>
+          <input type="text" id="nectar-alias" placeholder="temp-aws-session" required>
+        </div>
+        <div class="form-group">
+          <label for="nectar-secret">Secret Real</label>
+          <input type="password" id="nectar-secret" required placeholder="••••••••••••">
+        </div>
+        <div class="form-group">
+          <label for="nectar-ttl">TTL en Minutos (0 = Sin tiempo expiración)</label>
+          <input type="number" id="nectar-ttl" value="15">
+        </div>
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="checkbox" id="nectar-single-use" style="width: auto;"> 🏵️ Autodestrucción tras 1-Solo Uso
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="app.closeModal('create-nectar-modal')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Emitir Néctar 🏵️</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- MODAL: EDIT NECTAR -->
   <div id="edit-nectar-modal" class="modal">
     <div class="modal-content">
@@ -601,7 +634,7 @@
           <select id="invite-role-provider" onchange="app.toggleRoleProviderFields('invite')" style="background: #0d1117; color: #fff; border: 1px solid var(--border);">
             <option value="sinchlor_native">1. Rol Nativo Sinchlor (Viewer / Editor / Admin)</option>
             <option value="aws_iam">2. AWS Custom IAM Policy Document</option>
-            <option value="lumina_role">3. Lumina Security Suite Role ARN</option>
+            <option value="lumina_role">3. Lumina Security Role ARN</option>
             <option value="custom_json">4. Política Declarativa Personalizada Sinchlor</option>
           </select>
         </div>
@@ -626,7 +659,7 @@
           </div>
           <div class="form-group">
             <label for="invite-aws-json">Documento de Política JSON para AWS IAM</label>
-            <textarea id="invite-aws-json" rows="6" style="font-family: monospace; font-size: 0.8rem;"></textarea>
+            <textarea id="invite-aws-json" rows="6" style="font-family: monospace; font-size: 0.8rem;" placeholder='{\n  "Version": "2026-08-03",\n  "Statement": [\n    {\n      "Effect": "Allow",\n      "Action": ["sinchlor:petals:read", "sinchlor:petals:write"],\n      "Resource": "*"\n    }\n  ]\n}'></textarea>
           </div>
         </div>
 
@@ -634,7 +667,11 @@
         <div id="invite-group-lumina" class="provider-field-group" style="display: none;">
           <div class="form-group">
             <label for="invite-lumina-arn">Lumina Role ARN / ID</label>
-            <input type="text" id="invite-lumina-arn" placeholder="lumina:role:developer o lumina:role:38192">
+            <input type="text" id="invite-lumina-arn" placeholder="lumina:role:developer">
+          </div>
+          <div class="form-group">
+            <label for="invite-lumina-sanct">Lumina Sanct (Entorno)</label>
+            <input type="text" id="invite-lumina-sanct" placeholder="default" value="default">
           </div>
         </div>
 
@@ -642,12 +679,16 @@
         <div id="invite-group-custom" class="provider-field-group" style="display: none;">
           <div class="form-group">
             <label for="invite-custom-json">Política Declarativa JSON</label>
-            <textarea id="invite-custom-json" rows="6" style="font-family: monospace; font-size: 0.8rem;"></textarea>
+            <textarea id="invite-custom-json" rows="6" style="font-family: monospace; font-size: 0.8rem;" placeholder='{\n  "Version": "2026-08-03",\n  "Statement": [\n    {\n      "Effect": "Allow",\n      "Action": ["sinchlor:petals:read", "sinchlor:petals:reveal", "sinchlor:nectar:consume"],\n      "Resource": "*"\n    }\n  ]\n}'></textarea>
           </div>
           <div class="form-group">
             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-              <input type="checkbox" id="invite-export-lumina" style="width: auto;"> 🔮 Exportar esta política a Lumina Security Suite
+              <input type="checkbox" id="invite-export-lumina" style="width: auto;"> Exportar a Lumina
             </label>
+          </div>
+          <div class="form-group">
+            <label for="invite-custom-sanct">Lumina Sanct (Entorno Destino)</label>
+            <input type="text" id="invite-custom-sanct" placeholder="default" value="default">
           </div>
         </div>
 
@@ -678,7 +719,7 @@
           <select id="edit-role-provider" onchange="app.toggleRoleProviderFields('edit')" style="background: #0d1117; color: #fff; border: 1px solid var(--border);">
             <option value="sinchlor_native">1. Rol Nativo Sinchlor (Viewer / Editor / Admin)</option>
             <option value="aws_iam">2. AWS Custom IAM Policy Document</option>
-            <option value="lumina_role">3. Lumina Security Suite Role ARN</option>
+            <option value="lumina_role">3. Lumina Security Role ARN</option>
             <option value="custom_json">4. Política Declarativa Personalizada Sinchlor</option>
           </select>
         </div>
@@ -703,7 +744,7 @@
           </div>
           <div class="form-group">
             <label for="edit-aws-json">Documento de Política JSON para AWS IAM</label>
-            <textarea id="edit-aws-json" rows="6" style="font-family: monospace; font-size: 0.8rem;"></textarea>
+            <textarea id="edit-aws-json" rows="6" style="font-family: monospace; font-size: 0.8rem;" placeholder='{\n  "Version": "2026-08-03",\n  "Statement": [\n    {\n      "Effect": "Allow",\n      "Action": ["sinchlor:petals:read", "sinchlor:petals:write"],\n      "Resource": "*"\n    }\n  ]\n}'></textarea>
           </div>
         </div>
 
@@ -713,18 +754,26 @@
             <label for="edit-lumina-arn">Lumina Role ARN / ID</label>
             <input type="text" id="edit-lumina-arn" placeholder="lumina:role:developer">
           </div>
+          <div class="form-group">
+            <label for="edit-lumina-sanct">Lumina Sanct (Entorno)</label>
+            <input type="text" id="edit-lumina-sanct" placeholder="default" value="default">
+          </div>
         </div>
 
         <!-- PROVIDER 4: CUSTOM JSON POLICY + EXPORT TO LUMINA -->
         <div id="edit-group-custom" class="provider-field-group" style="display: none;">
           <div class="form-group">
             <label for="edit-custom-json">Política Declarativa JSON</label>
-            <textarea id="edit-custom-json" rows="6" style="font-family: monospace; font-size: 0.8rem;"></textarea>
+            <textarea id="edit-custom-json" rows="6" style="font-family: monospace; font-size: 0.8rem;" placeholder='{\n  "Version": "2026-08-03",\n  "Statement": [\n    {\n      "Effect": "Allow",\n      "Action": ["sinchlor:petals:read", "sinchlor:petals:reveal", "sinchlor:nectar:consume"],\n      "Resource": "*"\n    }\n  ]\n}'></textarea>
           </div>
           <div class="form-group">
             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-              <input type="checkbox" id="edit-export-lumina" style="width: auto;"> 🔮 Exportar esta política a Lumina Security Suite
+              <input type="checkbox" id="edit-export-lumina" style="width: auto;"> Exportar a Lumina
             </label>
+          </div>
+          <div class="form-group">
+            <label for="edit-custom-sanct">Lumina Sanct (Entorno Destino)</label>
+            <input type="text" id="edit-custom-sanct" placeholder="default" value="default">
           </div>
         </div>
 
