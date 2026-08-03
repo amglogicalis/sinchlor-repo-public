@@ -51,17 +51,15 @@ class SinchlorStudio {
     this.paradeName = document.getElementById('parade-name-input').value.trim();
     this.paradeKey = document.getElementById('parade-key-input').value.trim();
 
-    // User can enter PAT, Parade Key, or both
     this.token = this.paradeKey.startsWith('ghp_') ? this.paradeKey : (localStorage.getItem('sinchlor_token') || '');
 
     if (!this.token) {
-      this.token = this.paradeKey; // fallback
+      this.token = this.paradeKey;
     }
 
     this.showToast('Autenticando en Sinchlor Parade 🎪...', 'info');
     await this.loadVaultState();
 
-    // Find Parade by Name or ID
     const parade = Object.values(this.state.parades || {}).find(
       p => p.name.toLowerCase() === this.paradeName.toLowerCase() || p.paradeId === this.paradeName
     ) || Object.values(this.state.parades || {})[0];
@@ -71,7 +69,6 @@ class SinchlorStudio {
       return;
     }
 
-    // Validate Parade Key or PAT match
     let member = Object.values(parade.members || {}).find(m => m.paradeKey === this.paradeKey);
 
     if (!member && parade.adminKey === this.paradeKey) {
@@ -108,8 +105,8 @@ class SinchlorStudio {
     document.getElementById('app-container').style.display = 'flex';
 
     document.getElementById('console-mode-subtitle').textContent = 'Personal Vault';
-    document.getElementById('header-title').textContent = '🌺 Pétalos Semánticos (Personal Vault)';
-    document.getElementById('header-subtitle').textContent = 'Enmascara claves largas por aliases legibles resolvedores en memoria RAM';
+    document.getElementById('header-title').textContent = '📊 Dashboard de Recursos & Acceso Rápido';
+    document.getElementById('header-subtitle').textContent = 'Inventario completo y gestión en tiempo real de tu Bóveda Cápsula';
     document.getElementById('nav-item-team-admin').style.display = 'none';
 
     this.renderAll();
@@ -157,7 +154,6 @@ class SinchlorStudio {
   }
 
   async decryptVaultInBrowser(encryptedObj, pin = 'sinchlor-master-key') {
-    // If state is already plain JSON
     if (encryptedObj.petals || encryptedObj.parades) {
       return encryptedObj;
     }
@@ -167,12 +163,10 @@ class SinchlorStudio {
       const pinBuffer = enc.encode(pin);
       const saltBuffer = enc.encode('sinchlor_salt_v1');
 
-      // 1. Import PBKDF2 Key
       const keyMaterial = await window.crypto.subtle.importKey(
         'raw', pinBuffer, { name: 'PBKDF2' }, false, ['deriveKey']
       );
 
-      // 2. Derive AES-GCM Key (100,000 iterations, SHA-256, 256 bits)
       const key = await window.crypto.subtle.deriveKey(
         {
           name: 'PBKDF2',
@@ -186,18 +180,15 @@ class SinchlorStudio {
         ['decrypt']
       );
 
-      // 3. Prepare IV and Ciphertext + AuthTag
       const hexToBytes = (hex) => new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
       const iv = hexToBytes(encryptedObj.iv);
       const ciphertextBytes = hexToBytes(encryptedObj.ciphertext);
       const authTagBytes = hexToBytes(encryptedObj.authTag);
 
-      // Concatenate ciphertext and authTag for Web Crypto API AES-GCM
       const combined = new Uint8Array(ciphertextBytes.length + authTagBytes.length);
       combined.set(ciphertextBytes, 0);
       combined.set(authTagBytes, ciphertextBytes.length);
 
-      // 4. Decrypt
       const decryptedBuffer = await window.crypto.subtle.decrypt(
         { name: 'AES-GCM', iv: iv },
         key,
@@ -218,11 +209,38 @@ class SinchlorStudio {
   }
 
   renderAll() {
+    this.renderDashboard();
     this.renderPetals();
     this.renderParades();
     this.renderTraps();
     this.renderNectar();
     this.renderTeamMembers();
+  }
+
+  renderDashboard() {
+    const petals = Object.values(this.state.petals || {});
+    const traps = Object.values(this.state.traps || {});
+    const nectars = Object.values(this.state.nectars || {});
+
+    document.getElementById('dash-stat-petals').textContent = petals.length;
+    document.getElementById('dash-stat-traps').textContent = traps.length;
+    document.getElementById('dash-stat-nectars').textContent = nectars.filter(n => !n.used).length;
+
+    const tbody = document.getElementById('dash-petals-table-body');
+    if (petals.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Sin pétalos creados en esta bóveda.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = petals.slice(0, 5).map(p => `
+      <tr>
+        <td><code>sinchlor:${p.alias}</code></td>
+        <td><span class="badge badge-crimson">${p.category || 'general'}</span></td>
+        <td>
+          <button class="btn btn-outline btn-sm" onclick="app.openRevealModal('${p.alias}')">👁️ Revelar</button>
+        </td>
+      </tr>
+    `).join('');
   }
 
   renderPetals() {
@@ -294,6 +312,8 @@ class SinchlorStudio {
         <td><span class="badge badge-magenta">${t.triggeredCount || 0} disparos</span></td>
         <td>
           <button class="btn btn-outline btn-sm" onclick="app.triggerTrap('${t.trapId}')">🔥 Probar</button>
+          <button class="btn btn-outline btn-sm" onclick="app.openEditTrapModal('${t.trapId}')">✏️ Editar</button>
+          <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.deleteTrap('${t.trapId}')">🗑️</button>
         </td>
       </tr>
     `).join('');
@@ -315,7 +335,9 @@ class SinchlorStudio {
         <td>${n.expiresAt ? new Date(n.expiresAt).toLocaleTimeString() : 'Sin expiración'}</td>
         <td><span class="badge ${n.used ? 'badge-magenta' : 'badge-green'}">${n.used ? 'Consumido' : 'Disponible'}</span></td>
         <td>
-          <button class="btn btn-outline btn-sm" onclick="app.consumeNectar('${n.nectarId}')">🏵️ Consumir</button>
+          <button class="btn btn-outline btn-sm" onclick="app.consumeNectar('${n.nectarId}')" ${n.used ? 'disabled' : ''}>🏵️ Consumir</button>
+          <button class="btn btn-outline btn-sm" onclick="app.openEditNectarModal('${n.nectarId}')">✏️ Editar</button>
+          <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.deleteNectar('${n.nectarId}')">🗑️</button>
         </td>
       </tr>
     `).join('');
@@ -339,6 +361,108 @@ class SinchlorStudio {
     `).join('');
   }
 
+  // 🌸 PETALTRAPS ACTIONS
+  triggerTrap(trapId) {
+    const trap = this.state.traps[trapId];
+    if (!trap) return;
+
+    trap.triggeredCount = (trap.triggeredCount || 0) + 1;
+    trap.lastTriggeredAt = new Date().toISOString();
+
+    this.showToast(`🌸 ALERTA: ¡PetalTrap '${trap.alias}' probada/disparada! Total disparos: ${trap.triggeredCount}`, 'info');
+    this.renderAll();
+  }
+
+  openEditTrapModal(trapId) {
+    const trap = this.state.traps[trapId];
+    if (!trap) return;
+
+    document.getElementById('edit-trap-id').value = trap.trapId;
+    document.getElementById('edit-trap-alias').value = trap.alias;
+    document.getElementById('edit-trap-file').value = trap.targetFile || '';
+    this.openModal('edit-trap-modal');
+  }
+
+  handleSaveEditTrap(e) {
+    e.preventDefault();
+    const trapId = document.getElementById('edit-trap-id').value;
+    const alias = document.getElementById('edit-trap-alias').value.trim();
+    const file = document.getElementById('edit-trap-file').value.trim();
+
+    if (this.state.traps[trapId]) {
+      this.state.traps[trapId].alias = alias;
+      this.state.traps[trapId].targetFile = file;
+      this.closeModal('edit-trap-modal');
+      this.showToast(`PetalTrap '${alias}' modificada con éxito. 🌸`, 'success');
+      this.renderAll();
+    }
+  }
+
+  deleteTrap(trapId) {
+    const trap = this.state.traps[trapId];
+    if (trap && confirm(`¿Seguro que deseas eliminar la trampa '${trap.alias}'?`)) {
+      delete this.state.traps[trapId];
+      this.showToast(`PetalTrap '${trap.alias}' eliminada.`, 'success');
+      this.renderAll();
+    }
+  }
+
+  // 🏵️ NECTAR EFIMERO ACTIONS
+  consumeNectar(nectarId) {
+    const nectar = this.state.nectars[nectarId];
+    if (!nectar) return;
+
+    if (nectar.used) {
+      this.showToast(`❌ El néctar '${nectar.alias}' ya fue consumido.`, 'error');
+      return;
+    }
+
+    if (nectar.singleUse) {
+      nectar.used = true;
+      nectar.usedAt = new Date().toISOString();
+      this.showToast(`🏵️ Néctar '${nectar.alias}' consumido: "${nectar.secretValue}" (Autodestruido)`, 'success');
+    } else {
+      this.showToast(`🏵️ Néctar '${nectar.alias}' obtenido: "${nectar.secretValue}"`, 'info');
+    }
+
+    this.renderAll();
+  }
+
+  openEditNectarModal(nectarId) {
+    const nectar = this.state.nectars[nectarId];
+    if (!nectar) return;
+
+    document.getElementById('edit-nectar-id').value = nectar.nectarId;
+    document.getElementById('edit-nectar-alias').value = nectar.alias;
+    document.getElementById('edit-nectar-secret').value = '';
+    this.openModal('edit-nectar-modal');
+  }
+
+  handleSaveEditNectar(e) {
+    e.preventDefault();
+    const nectarId = document.getElementById('edit-nectar-id').value;
+    const alias = document.getElementById('edit-nectar-alias').value.trim();
+    const secret = document.getElementById('edit-nectar-secret').value.trim();
+
+    if (this.state.nectars[nectarId]) {
+      this.state.nectars[nectarId].alias = alias;
+      if (secret) this.state.nectars[nectarId].secretValue = secret;
+      this.closeModal('edit-nectar-modal');
+      this.showToast(`Néctar '${alias}' modificado con éxito. 🏵️`, 'success');
+      this.renderAll();
+    }
+  }
+
+  deleteNectar(nectarId) {
+    const nectar = this.state.nectars[nectarId];
+    if (nectar && confirm(`¿Seguro que deseas eliminar el néctar '${nectar.alias}'?`)) {
+      delete this.state.nectars[nectarId];
+      this.showToast(`Néctar '${nectar.alias}' eliminado.`, 'success');
+      this.renderAll();
+    }
+  }
+
+  // 🌺 PETAL ACTIONS
   handleCreatePetal(e) {
     e.preventDefault();
     const alias = document.getElementById('petal-alias').value.trim();
@@ -377,6 +501,67 @@ class SinchlorStudio {
       this.showToast(`Pétalo '${alias}' eliminado.`, 'success');
       this.renderAll();
     }
+  }
+
+  // 🌸 PETALTRAP CREATION
+  handleCreateTrap(e) {
+    e.preventDefault();
+    const alias = document.getElementById('trap-alias').value.trim();
+    const discord = document.getElementById('trap-discord').value.trim();
+    const telegramToken = document.getElementById('trap-telegram-token').value.trim();
+    const telegramChat = document.getElementById('trap-telegram-chat').value.trim();
+
+    const cleanAlias = alias.replace(/^\[?sinchlor:/, '').replace(/\]$/, '').trim();
+    const trapId = `trap_${Date.now()}`;
+    const trap = {
+      trapId,
+      alias: cleanAlias,
+      decoyToken: `ghp_trap_${Math.random().toString(36).slice(2, 10)}_decoy`,
+      alertChannels: {
+        discordWebhook: discord || undefined,
+        telegramBotToken: telegramToken || undefined,
+        telegramChatId: telegramChat || undefined,
+        githubIssue: true
+      },
+      active: true,
+      triggeredCount: 0,
+      createdAt: new Date().toISOString()
+    };
+
+    this.state.traps[trapId] = trap;
+    this.closeModal('create-trap-modal');
+    this.showToast(`PetalTrap '${cleanAlias}' plantada con éxito! 🌸`, 'success');
+    this.renderAll();
+  }
+
+  // 🏵️ NECTAR CREATION
+  handleCreateNectar(e) {
+    e.preventDefault();
+    const alias = document.getElementById('nectar-alias').value.trim();
+    const secret = document.getElementById('nectar-secret').value.trim();
+    const ttlMins = parseInt(document.getElementById('nectar-ttl').value || '15', 10);
+    const singleUse = document.getElementById('nectar-single-use').checked;
+
+    const cleanAlias = alias.replace(/^\[?sinchlor:/, '').replace(/\]$/, '').trim();
+    const nectarId = `nectar_${Date.now()}`;
+    const now = new Date();
+    const expiresAt = ttlMins > 0 ? new Date(now.getTime() + ttlMins * 60000).toISOString() : undefined;
+
+    const nectar = {
+      nectarId,
+      alias: cleanAlias,
+      secretValue: secret,
+      ttlSeconds: ttlMins * 60,
+      expiresAt,
+      singleUse,
+      used: false,
+      createdAt: now.toISOString()
+    };
+
+    this.state.nectars[nectarId] = nectar;
+    this.closeModal('create-nectar-modal');
+    this.showToast(`Néctar Efímero '${cleanAlias}' emitido con éxito! 🏵️`, 'success');
+    this.renderAll();
   }
 
   testPetalShieldScan() {
