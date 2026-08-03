@@ -119,7 +119,7 @@
 
       <!-- TAB 0: DASHBOARD / INVENTARIO GENERAL -->
       <section id="tab-dashboard" class="tab-content active">
-        <!-- STATS INVENTORY GRID -->
+        <!-- STATS INVENTORY GRID (3 MAIN STAT CARDS) -->
         <div class="stats-grid">
           <div class="stat-card glass-panel" onclick="app.switchTab('petals')" style="cursor: pointer;">
             <span class="stat-icon">🌺</span>
@@ -140,13 +140,6 @@
             <div class="stat-info">
               <span class="stat-value" id="dash-stat-nectars">0</span>
               <span class="stat-label">Néctar Efímero Activo</span>
-            </div>
-          </div>
-          <div class="stat-card glass-panel">
-            <span class="stat-icon">⚡</span>
-            <div class="stat-info">
-              <span class="stat-value">RAM Inyección</span>
-              <span class="stat-label">Estado: ACTIVO</span>
             </div>
           </div>
         </div>
@@ -303,9 +296,9 @@
               <thead>
                 <tr>
                   <th>Alias Trampa</th>
-                  <th>Repo / Archivo Destino</th>
+                  <th>Ubicación (Usuario/Repo/Ruta)</th>
                   <th>Token Señuelo</th>
-                  <th>Alertas</th>
+                  <th>Alertas Activas</th>
                   <th>Disparos</th>
                   <th>Acciones</th>
                 </tr>
@@ -444,6 +437,55 @@
     </div>
   </div>
 
+  <!-- MODAL: CREATE TRAP -->
+  <div id="create-trap-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>🌸 Crear PetalTrap (Honeytoken / Trampa)</h3>
+        <button class="close-btn" onclick="app.closeModal('create-trap-modal')">&times;</button>
+      </div>
+      <form onsubmit="app.handleCreateTrap(event)">
+        <div class="form-group">
+          <label for="trap-alias">Alias Trampa</label>
+          <input type="text" id="trap-alias" placeholder="trap-github-pat" required>
+        </div>
+        <div class="form-group">
+          <label for="trap-target-location">Ubicación Destino (usuario/repo/ruta)</label>
+          <input type="text" id="trap-target-location" placeholder="amglogicalis/mi-app/src/config.js" required>
+        </div>
+        <div style="border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 1rem;">
+          <h4 style="margin-bottom: 0.75rem; font-size: 0.9rem;">🔔 Configuración de Canales de Alerta:</h4>
+          
+          <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="checkbox" id="trap-enable-github" checked style="width: auto;"> 🐙 GitHub Issue Alert
+            </label>
+            <input type="text" id="trap-github-repo" value="amglogicalis/.sinchlor-storage" placeholder="Repo para crear la Issue (ej: amglogicalis/mi-app)" style="margin-top: 0.3rem;">
+          </div>
+
+          <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="checkbox" id="trap-enable-discord" style="width: auto;"> 💬 Discord Webhook
+            </label>
+            <input type="url" id="trap-discord" placeholder="https://discord.com/api/webhooks/..." style="margin-top: 0.3rem;">
+          </div>
+
+          <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="checkbox" id="trap-enable-telegram" style="width: auto;"> ✈️ Bot Telegram
+            </label>
+            <input type="text" id="trap-telegram-token" placeholder="Bot Token (ej: 123456:ABC-DEF...)" style="margin-top: 0.3rem;">
+            <input type="text" id="trap-telegram-chat" placeholder="Chat ID (ej: 987654321)" style="margin-top: 0.3rem;">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="app.closeModal('create-trap-modal')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Plantar Trampa 🌸</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- MODAL: EDIT TRAP -->
   <div id="edit-trap-modal" class="modal">
     <div class="modal-content">
@@ -458,12 +500,33 @@
           <input type="text" id="edit-trap-alias" required>
         </div>
         <div class="form-group">
-          <label for="edit-trap-file">Repo / Archivo Destino</label>
-          <input type="text" id="edit-trap-file" placeholder="amglogicalis/mi-repo / src/config.js">
+          <label for="edit-trap-location">Ubicación Destino (usuario/repo/ruta)</label>
+          <input type="text" id="edit-trap-location" placeholder="amglogicalis/mi-app/src/config.js" required>
         </div>
-        <div class="form-group">
-          <label for="edit-trap-discord">Discord Webhook URL</label>
-          <input type="url" id="edit-trap-discord" placeholder="https://discord.com/api/webhooks/...">
+        <div style="border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 1rem;">
+          <h4 style="margin-bottom: 0.75rem; font-size: 0.9rem;">🔔 Configuración de Notificaciones y Alertas:</h4>
+          
+          <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="checkbox" id="edit-trap-enable-github" style="width: auto;"> 🐙 GitHub Issue Alert
+            </label>
+            <input type="text" id="edit-trap-github-repo" placeholder="Repo para crear la Issue (ej: amglogicalis/.sinchlor-storage)" style="margin-top: 0.3rem;">
+          </div>
+
+          <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="checkbox" id="edit-trap-enable-discord" style="width: auto;"> 💬 Discord Webhook
+            </label>
+            <input type="url" id="edit-trap-discord" placeholder="https://discord.com/api/webhooks/..." style="margin-top: 0.3rem;">
+          </div>
+
+          <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="checkbox" id="edit-trap-enable-telegram" style="width: auto;"> ✈️ Bot Telegram
+            </label>
+            <input type="text" id="edit-trap-telegram-token" placeholder="Bot Token" style="margin-top: 0.3rem;">
+            <input type="text" id="edit-trap-telegram-chat" placeholder="Chat ID" style="margin-top: 0.3rem;">
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" onclick="app.closeModal('edit-trap-modal')">Cancelar</button>
@@ -491,8 +554,18 @@
           <input type="password" id="edit-nectar-secret" placeholder="••••••••">
         </div>
         <div class="form-group">
-          <label for="edit-nectar-ttl">TTL en Minutos</label>
+          <label for="edit-nectar-ttl">Refrescar TTL en Minutos (0 = Sin tiempo expiración)</label>
           <input type="number" id="edit-nectar-ttl" value="15">
+        </div>
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="checkbox" id="edit-nectar-single-use" style="width: auto;"> 🏵️ Autodestrucción tras 1-Solo Uso
+          </label>
+        </div>
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="checkbox" id="edit-nectar-reactivate" style="width: auto;"> 🔄 Marcar como Disponible (Resetear estado consumido)
+          </label>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" onclick="app.closeModal('edit-nectar-modal')">Cancelar</button>
@@ -565,42 +638,6 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" onclick="app.closeModal('invite-member-modal')">Cancelar</button>
           <button type="submit" class="btn btn-primary">Generar Parade Key 🔑</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL: CREATE TRAP -->
-  <div id="create-trap-modal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>🌸 Crear PetalTrap (Honeytoken / Trampa)</h3>
-        <button class="close-btn" onclick="app.closeModal('create-trap-modal')">&times;</button>
-      </div>
-      <form onsubmit="app.handleCreateTrap(event)">
-        <div class="form-group">
-          <label for="trap-alias">Alias Trampa</label>
-          <input type="text" id="trap-alias" placeholder="trap-github-pat" required>
-        </div>
-        <div class="form-group">
-          <label for="trap-target-file">Repo / Archivo Destino</label>
-          <input type="text" id="trap-target-file" placeholder="amglogicalis/mi-app / src/config.js">
-        </div>
-        <div class="form-group">
-          <label for="trap-discord">Discord Webhook URL (Opcional)</label>
-          <input type="url" id="trap-discord" placeholder="https://discord.com/api/webhooks/...">
-        </div>
-        <div class="form-group">
-          <label for="trap-telegram-token">Telegram Bot Token (Opcional)</label>
-          <input type="text" id="trap-telegram-token" placeholder="123456:ABC-DEF...">
-        </div>
-        <div class="form-group">
-          <label for="trap-telegram-chat">Telegram Chat ID (Opcional)</label>
-          <input type="text" id="trap-telegram-chat" placeholder="987654321">
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline" onclick="app.closeModal('create-trap-modal')">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Plantar Trampa 🌸</button>
         </div>
       </form>
     </div>
