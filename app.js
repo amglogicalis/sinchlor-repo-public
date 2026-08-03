@@ -186,6 +186,13 @@ class SinchlorStudio {
     }
   }
 
+  async syncVault() {
+    this.showToast('🔄 Sincronizando Bóveda con GitHub...', 'info');
+    await this.loadVaultState();
+    this.renderAll();
+    this.showToast('✅ Bóveda sincronizada exitosamente con GitHub', 'success');
+  }
+
   async decryptVaultInBrowser(encryptedObj, pin = 'sinchlor-master-key') {
     if (encryptedObj.petals || encryptedObj.parades) {
       return encryptedObj;
@@ -339,21 +346,30 @@ class SinchlorStudio {
       return;
     }
 
-    tbody.innerHTML = traps.map(t => `
-      <tr>
-        <td><code>${t.alias}</code></td>
-        <td><span style="font-size: 0.85rem; color: var(--text-muted);">${t.targetFile || 'amglogicalis/.sinchlor-storage'}</span></td>
-        <td><span style="font-family: monospace; color: var(--accent-gold);">${t.decoyToken.slice(0, 14)}...</span></td>
-        <td><span class="badge badge-green">Discord / Telegram / Issue</span></td>
-        <td><span class="badge badge-magenta">${t.triggeredCount || 0} disparos</span></td>
-        <td>
-          <button class="btn btn-outline btn-sm" onclick="app.triggerTrap('${t.trapId}')">🔥 Probar</button>
-          <button class="btn btn-outline btn-sm" onclick="app.recreateTrap('${t.trapId}')">🔄 Recrear</button>
-          <button class="btn btn-outline btn-sm" onclick="app.openEditTrapModal('${t.trapId}')">✏️ Editar</button>
-          <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.confirmDeleteTrap('${t.trapId}')">🗑️</button>
-        </td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = traps.map(t => {
+      const channels = [];
+      if (t.alertChannels?.githubIssue !== false) channels.push(`🐙 Issue (${t.alertChannels?.githubIssueRepo || '.sinchlor-storage'})`);
+      if (t.alertChannels?.discordWebhook) channels.push('💬 Discord');
+      if (t.alertChannels?.telegramBotToken) channels.push('✈️ Telegram');
+
+      const targetPath = t.targetRepo ? `${t.targetRepo}/${t.targetFile || ''}` : (t.targetFile || 'amglogicalis/.sinchlor-storage');
+
+      return `
+        <tr>
+          <td><code>${t.alias}</code></td>
+          <td><span style="font-size: 0.85rem; color: var(--text-muted);">${targetPath}</span></td>
+          <td><span style="font-family: monospace; color: var(--accent-gold);">${t.decoyToken.slice(0, 14)}...</span></td>
+          <td><span class="badge badge-green">${channels.join(' • ') || 'Nativa'}</span></td>
+          <td><span class="badge badge-magenta">${t.triggeredCount || 0} disparos</span></td>
+          <td>
+            <button class="btn btn-outline btn-sm" onclick="app.triggerTrap('${t.trapId}')">🔥 Probar</button>
+            <button class="btn btn-outline btn-sm" onclick="app.recreateTrap('${t.trapId}')">🔄 Recrear</button>
+            <button class="btn btn-outline btn-sm" onclick="app.openEditTrapModal('${t.trapId}')">✏️ Editar</button>
+            <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.confirmDeleteTrap('${t.trapId}')">🗑️</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
   }
 
   renderNectar() {
@@ -464,7 +480,8 @@ class SinchlorStudio {
     trap.triggeredCount = (trap.triggeredCount || 0) + 1;
     trap.lastTriggeredAt = new Date().toISOString();
 
-    this.showToast(`🌸 ALERTA: ¡PetalTrap '${trap.alias}' probada/disparada! Total disparos: ${trap.triggeredCount}`, 'info');
+    const target = trap.targetRepo ? `${trap.targetRepo}/${trap.targetFile || ''}` : (trap.targetFile || '.sinchlor-storage');
+    this.showToast(`🌸 ALERTA: PetalTrap '${trap.alias}' probada/disparada en ${target}! Disparos: ${trap.triggeredCount}`, 'info');
     this.renderAll();
   }
 
@@ -481,10 +498,22 @@ class SinchlorStudio {
     const trap = this.state.traps[trapId];
     if (!trap) return;
 
+    const fullLocation = trap.targetRepo ? `${trap.targetRepo}/${trap.targetFile || ''}` : (trap.targetFile || '');
+
     document.getElementById('edit-trap-id').value = trap.trapId;
     document.getElementById('edit-trap-alias').value = trap.alias;
-    document.getElementById('edit-trap-file').value = trap.targetFile || '';
+    document.getElementById('edit-trap-location').value = fullLocation;
+
+    document.getElementById('edit-trap-enable-github').checked = trap.alertChannels?.githubIssue !== false;
+    document.getElementById('edit-trap-github-repo').value = trap.alertChannels?.githubIssueRepo || 'amglogicalis/.sinchlor-storage';
+
+    document.getElementById('edit-trap-enable-discord').checked = !!trap.alertChannels?.discordWebhook;
     document.getElementById('edit-trap-discord').value = trap.alertChannels?.discordWebhook || '';
+
+    document.getElementById('edit-trap-enable-telegram').checked = !!trap.alertChannels?.telegramBotToken;
+    document.getElementById('edit-trap-telegram-token').value = trap.alertChannels?.telegramBotToken || '';
+    document.getElementById('edit-trap-telegram-chat').value = trap.alertChannels?.telegramChatId || '';
+
     this.openModal('edit-trap-modal');
   }
 
@@ -492,14 +521,41 @@ class SinchlorStudio {
     e.preventDefault();
     const trapId = document.getElementById('edit-trap-id').value;
     const alias = document.getElementById('edit-trap-alias').value.trim();
-    const file = document.getElementById('edit-trap-file').value.trim();
-    const discord = document.getElementById('edit-trap-discord').value.trim();
+    const fullLoc = document.getElementById('edit-trap-location').value.trim();
+
+    const parts = fullLoc.split('/');
+    let targetRepo = '';
+    let targetFile = '';
+
+    if (parts.length >= 2) {
+      targetRepo = `${parts[0]}/${parts[1]}`;
+      targetFile = parts.slice(2).join('/');
+    } else {
+      targetFile = fullLoc;
+    }
+
+    const enableGithub = document.getElementById('edit-trap-enable-github').checked;
+    const githubRepo = document.getElementById('edit-trap-github-repo').value.trim();
+
+    const enableDiscord = document.getElementById('edit-trap-enable-discord').checked;
+    const discordUrl = document.getElementById('edit-trap-discord').value.trim();
+
+    const enableTelegram = document.getElementById('edit-trap-enable-telegram').checked;
+    const tgToken = document.getElementById('edit-trap-telegram-token').value.trim();
+    const tgChat = document.getElementById('edit-trap-telegram-chat').value.trim();
 
     if (this.state.traps[trapId]) {
       this.state.traps[trapId].alias = alias;
-      this.state.traps[trapId].targetFile = file;
-      if (!this.state.traps[trapId].alertChannels) this.state.traps[trapId].alertChannels = {};
-      this.state.traps[trapId].alertChannels.discordWebhook = discord || undefined;
+      this.state.traps[trapId].targetRepo = targetRepo;
+      this.state.traps[trapId].targetFile = targetFile;
+
+      this.state.traps[trapId].alertChannels = {
+        githubIssue: enableGithub,
+        githubIssueRepo: enableGithub ? githubRepo : undefined,
+        discordWebhook: enableDiscord ? discordUrl : undefined,
+        telegramBotToken: enableTelegram ? tgToken : undefined,
+        telegramChatId: enableTelegram ? tgChat : undefined
+      };
 
       this.closeModal('edit-trap-modal');
       this.showToast(`PetalTrap '${alias}' modificada con éxito. 🌸`, 'success');
@@ -549,6 +605,9 @@ class SinchlorStudio {
     document.getElementById('edit-nectar-id').value = nectar.nectarId;
     document.getElementById('edit-nectar-alias').value = nectar.alias;
     document.getElementById('edit-nectar-secret').value = '';
+    document.getElementById('edit-nectar-single-use').checked = !!nectar.singleUse;
+    document.getElementById('edit-nectar-reactivate').checked = false;
+
     this.openModal('edit-nectar-modal');
   }
 
@@ -558,12 +617,21 @@ class SinchlorStudio {
     const alias = document.getElementById('edit-nectar-alias').value.trim();
     const secret = document.getElementById('edit-nectar-secret').value.trim();
     const ttlMins = parseInt(document.getElementById('edit-nectar-ttl').value || '15', 10);
+    const singleUse = document.getElementById('edit-nectar-single-use').checked;
+    const reactivate = document.getElementById('edit-nectar-reactivate').checked;
 
     if (this.state.nectars[nectarId]) {
       this.state.nectars[nectarId].alias = alias;
+      this.state.nectars[nectarId].singleUse = singleUse;
+
       if (secret) this.state.nectars[nectarId].secretValue = secret;
       if (ttlMins > 0) {
         this.state.nectars[nectarId].expiresAt = new Date(Date.now() + ttlMins * 60000).toISOString();
+      }
+
+      if (reactivate) {
+        this.state.nectars[nectarId].used = false;
+        delete this.state.nectars[nectarId].usedAt;
       }
 
       this.closeModal('edit-nectar-modal');
@@ -623,23 +691,43 @@ class SinchlorStudio {
   handleCreateTrap(e) {
     e.preventDefault();
     const alias = document.getElementById('trap-alias').value.trim();
-    const targetFile = document.getElementById('trap-target-file').value.trim();
-    const discord = document.getElementById('trap-discord').value.trim();
-    const telegramToken = document.getElementById('trap-telegram-token').value.trim();
-    const telegramChat = document.getElementById('trap-telegram-chat').value.trim();
+    const fullLoc = document.getElementById('trap-target-location').value.trim();
+
+    const parts = fullLoc.split('/');
+    let targetRepo = '';
+    let targetFile = '';
+
+    if (parts.length >= 2) {
+      targetRepo = `${parts[0]}/${parts[1]}`;
+      targetFile = parts.slice(2).join('/');
+    } else {
+      targetFile = fullLoc;
+    }
+
+    const enableGithub = document.getElementById('trap-enable-github').checked;
+    const githubRepo = document.getElementById('trap-github-repo').value.trim();
+
+    const enableDiscord = document.getElementById('trap-enable-discord').checked;
+    const discordUrl = document.getElementById('trap-discord').value.trim();
+
+    const enableTelegram = document.getElementById('trap-enable-telegram').checked;
+    const tgToken = document.getElementById('trap-telegram-token').value.trim();
+    const tgChat = document.getElementById('trap-telegram-chat').value.trim();
 
     const cleanAlias = alias.replace(/^\[?sinchlor:/, '').replace(/\]$/, '').trim();
     const trapId = `trap_${Date.now()}`;
     const trap = {
       trapId,
       alias: cleanAlias,
-      targetFile: targetFile || 'amglogicalis/.sinchlor-storage',
+      targetRepo: targetRepo || 'amglogicalis/mi-app',
+      targetFile: targetFile || 'src/config.js',
       decoyToken: `ghp_trap_${Math.random().toString(36).slice(2, 10)}_decoy`,
       alertChannels: {
-        discordWebhook: discord || undefined,
-        telegramBotToken: telegramToken || undefined,
-        telegramChatId: telegramChat || undefined,
-        githubIssue: true
+        githubIssue: enableGithub,
+        githubIssueRepo: enableGithub ? (githubRepo || 'amglogicalis/.sinchlor-storage') : undefined,
+        discordWebhook: enableDiscord ? discordUrl : undefined,
+        telegramBotToken: enableTelegram ? tgToken : undefined,
+        telegramChatId: enableTelegram ? tgChat : undefined
       },
       active: true,
       triggeredCount: 0,
@@ -652,7 +740,7 @@ class SinchlorStudio {
     this.renderAll();
   }
 
-  // 🏵️ NECTAR CREATION
+  // REST OF METHODS
   handleCreateNectar(e) {
     e.preventDefault();
     const alias = document.getElementById('nectar-alias').value.trim();
@@ -682,7 +770,6 @@ class SinchlorStudio {
     this.renderAll();
   }
 
-  // 🛡️ PETALSHIELD GUARD SCANNER (CLIENT-SIDE SCANNER)
   testPetalShieldScan() {
     const text = document.getElementById('scanner-input').value;
     if (!text) return;
@@ -707,7 +794,7 @@ class SinchlorStudio {
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      if (line.includes('sinchlor-ignore')) continue; // Skip ignored lines
+      if (line.includes('sinchlor-ignore')) continue;
 
       for (const sig of signatures) {
         const regex = new RegExp(sig.regex.source, 'g');
@@ -737,7 +824,6 @@ class SinchlorStudio {
     }
   }
 
-  // CUSTOM GLASS CONFIRMATION MODAL (#780510 Theme)
   openConfirmModal(message, onConfirm) {
     document.getElementById('confirm-modal-message').textContent = message;
     this.confirmCallback = onConfirm;
