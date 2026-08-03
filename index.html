@@ -4,9 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🛡️ SINCHLOR Studio — Secrets Camouflage & Credentials Engine</title>
+  <link rel="icon" type="image/png" href="assets/logo_sinchlor.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -25,7 +26,7 @@
         <button id="mode-btn-parade" class="mode-tab" onclick="app.switchLoginMode('parade')">🎪 Sinchlor Parade (Equipo)</button>
       </div>
 
-      <!-- FORM: PERSONAL MODE (SIMPLIFIED — PAT ONLY!) -->
+      <!-- FORM: PERSONAL MODE (PAT ONLY!) -->
       <form id="personal-login-form" onsubmit="app.handleConnectPersonal(event)">
         <div class="form-group">
           <label for="login-token">GitHub Personal Access Token (PAT)</label>
@@ -62,7 +63,11 @@
       </div>
 
       <nav class="nav-menu">
-        <button class="nav-item active" onclick="app.switchTab('petals')">
+        <button class="nav-item active" onclick="app.switchTab('dashboard')">
+          <span class="nav-icon">📊</span>
+          <span>Dashboard / Inventario</span>
+        </button>
+        <button class="nav-item" onclick="app.switchTab('petals')">
           <span class="nav-icon">🌺</span>
           <span>Pétalos Semánticos</span>
         </button>
@@ -103,8 +108,8 @@
       <!-- TOPBAR -->
       <header class="topbar">
         <div class="topbar-title">
-          <h1 id="header-title">🌺 Pétalos Semánticos (Alias DNS de Secretos)</h1>
-          <p id="header-subtitle">Enmascara claves largas por aliases legibles resolvedores en memoria RAM</p>
+          <h1 id="header-title">📊 Dashboard de Recursos & Acceso Rápido</h1>
+          <p id="header-subtitle">Inventario completo y gestión en tiempo real de tu Bóveda Cápsula</p>
         </div>
         <div class="topbar-actions">
           <button class="btn btn-outline" onclick="app.openModal('create-petal-modal')">➕ Crear Pétalo</button>
@@ -112,8 +117,78 @@
         </div>
       </header>
 
+      <!-- TAB 0: DASHBOARD / INVENTARIO GENERAL -->
+      <section id="tab-dashboard" class="tab-content active">
+        <!-- STATS INVENTORY GRID -->
+        <div class="stats-grid">
+          <div class="stat-card glass-panel" onclick="app.switchTab('petals')" style="cursor: pointer;">
+            <span class="stat-icon">🌺</span>
+            <div class="stat-info">
+              <span class="stat-value" id="dash-stat-petals">0</span>
+              <span class="stat-label">Pétalos Semánticos</span>
+            </div>
+          </div>
+          <div class="stat-card glass-panel" onclick="app.switchTab('traps')" style="cursor: pointer;">
+            <span class="stat-icon">🌸</span>
+            <div class="stat-info">
+              <span class="stat-value" id="dash-stat-traps">0</span>
+              <span class="stat-label">PetalTraps (Honeytokens)</span>
+            </div>
+          </div>
+          <div class="stat-card glass-panel" onclick="app.switchTab('nectar')" style="cursor: pointer;">
+            <span class="stat-icon">🏵️</span>
+            <div class="stat-info">
+              <span class="stat-value" id="dash-stat-nectars">0</span>
+              <span class="stat-label">Néctar Efímero Activo</span>
+            </div>
+          </div>
+          <div class="stat-card glass-panel">
+            <span class="stat-icon">⚡</span>
+            <div class="stat-info">
+              <span class="stat-value">RAM Inyección</span>
+              <span class="stat-label">Estado: ACTIVO</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- FAST ACCESS ACTIONS -->
+        <div class="card glass-panel" style="margin-top: 1.5rem;">
+          <div class="card-header">
+            <h3>⚡ Accesos Rápidos</h3>
+          </div>
+          <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <button class="btn btn-primary" onclick="app.openModal('create-petal-modal')">🌺 Nuevo Pétalo Semántico</button>
+            <button class="btn btn-outline" onclick="app.openModal('create-trap-modal')">🌸 Plantar PetalTrap</button>
+            <button class="btn btn-outline" onclick="app.openModal('create-nectar-modal')">🏵️ Emitir Néctar Efímero</button>
+            <button class="btn btn-outline" onclick="app.switchTab('petalshield')">🛡️ Escanear Código (PetalShield)</button>
+          </div>
+        </div>
+
+        <!-- RECENT PETALS SUMMARY -->
+        <div class="card glass-panel" style="margin-top: 1.5rem;">
+          <div class="card-header">
+            <h3>🌺 Vista Rápida de Pétalos Guardados</h3>
+            <button class="btn btn-outline btn-sm" onclick="app.switchTab('petals')">Ver Todos ➔</button>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Alias Semántico</th>
+                  <th>Categoría</th>
+                  <th>Acciones Rápidas</th>
+                </tr>
+              </thead>
+              <tbody id="dash-petals-table-body">
+                <!-- Dynamic Quick Petals -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <!-- TAB 1: PETALS -->
-      <section id="tab-petals" class="tab-content active">
+      <section id="tab-petals" class="tab-content" style="display: none;">
         <div class="stats-grid">
           <div class="stat-card glass-panel">
             <span class="stat-icon">🌺</span>
@@ -140,7 +215,7 @@
 
         <div class="card glass-panel" style="margin-top: 1.5rem;">
           <div class="card-header">
-            <h3>🌺 Catálogo de Pétalos (Aliases DNS)</h3>
+            <h3>🌺 Catálogo de Pétalos (Aliases)</h3>
           </div>
           <div class="table-responsive">
             <table class="data-table">
@@ -306,7 +381,7 @@
   <div id="create-petal-modal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>🌺 Crear Pétalo Semántico (Alias DNS)</h3>
+        <h3>🌺 Crear Pétalo Semántico (Alias)</h3>
         <button class="close-btn" onclick="app.closeModal('create-petal-modal')">&times;</button>
       </div>
       <form onsubmit="app.handleCreatePetal(event)">
@@ -329,6 +404,56 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" onclick="app.closeModal('create-petal-modal')">Cancelar</button>
           <button type="submit" class="btn btn-primary">Guardar Pétalo 🌺</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: EDIT TRAP -->
+  <div id="edit-trap-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>🌸 Modificar PetalTrap</h3>
+        <button class="close-btn" onclick="app.closeModal('edit-trap-modal')">&times;</button>
+      </div>
+      <form onsubmit="app.handleSaveEditTrap(event)">
+        <input type="hidden" id="edit-trap-id">
+        <div class="form-group">
+          <label for="edit-trap-alias">Alias Trampa</label>
+          <input type="text" id="edit-trap-alias" required>
+        </div>
+        <div class="form-group">
+          <label for="edit-trap-file">Archivo Objetivo (Opcional)</label>
+          <input type="text" id="edit-trap-file" placeholder="src/config.js">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="app.closeModal('edit-trap-modal')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Cambios 🌸</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: EDIT NECTAR -->
+  <div id="edit-nectar-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>🏵️ Modificar Néctar Efímero</h3>
+        <button class="close-btn" onclick="app.closeModal('edit-nectar-modal')">&times;</button>
+      </div>
+      <form onsubmit="app.handleSaveEditNectar(event)">
+        <input type="hidden" id="edit-nectar-id">
+        <div class="form-group">
+          <label for="edit-nectar-alias">Alias Néctar</label>
+          <input type="text" id="edit-nectar-alias" required>
+        </div>
+        <div class="form-group">
+          <label for="edit-nectar-secret">Nuevo Secret Real (Dejar en blanco para mantener)</label>
+          <input type="password" id="edit-nectar-secret" placeholder="••••••••">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="app.closeModal('edit-nectar-modal')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Cambios 🏵️</button>
         </div>
       </form>
     </div>
