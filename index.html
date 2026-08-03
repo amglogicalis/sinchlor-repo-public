@@ -216,6 +216,7 @@
         <div class="card glass-panel" style="margin-top: 1.5rem;">
           <div class="card-header">
             <h3>🌺 Catálogo de Pétalos (Aliases)</h3>
+            <button class="btn btn-primary btn-sm" onclick="app.openModal('create-petal-modal')">➕ Nuevo Pétalo</button>
           </div>
           <div class="table-responsive">
             <table class="data-table">
@@ -275,11 +276,11 @@
             <h3>🛡️ PetalShield Guard (Escáner Pre-Commit Anti-Fugas)</h3>
           </div>
           <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
-            Prueba el motor de escaneo de alta precisión. Detecta GitHub PATs, OpenAI Keys, AWS Secrets y cadenas de alta entropía con cero falsos positivos.
+            Prueba el motor de escaneo de alta precisión. Detecta GitHub PATs, OpenAI Keys, Anthropic Keys, AWS Secrets y cadenas de alta entropía con cero falsos positivos.
           </p>
           <div class="form-group">
             <label for="scanner-input">Probar Escaneo de Código en Vivo</label>
-            <textarea id="scanner-input" rows="4" placeholder='const token = "ghp_1234567890abcdefghijklmnopqrstuvwxyz"; // pegado por error'></textarea>
+            <textarea id="scanner-input" rows="5" placeholder='const OPENAI_SECRET = "sk-proj-prod1234567890abcdefghijklmnopqrstuvwxyz1234567890abcdef";'></textarea>
           </div>
           <button class="btn btn-primary" onclick="app.testPetalShieldScan()">🔍 Ejecutar Escaneo PetalShield</button>
 
@@ -302,6 +303,7 @@
               <thead>
                 <tr>
                   <th>Alias Trampa</th>
+                  <th>Repo / Archivo Destino</th>
                   <th>Token Señuelo</th>
                   <th>Alertas</th>
                   <th>Disparos</th>
@@ -329,7 +331,7 @@
                 <tr>
                   <th>Alias Néctar</th>
                   <th>Tipo</th>
-                  <th>Expiración / TTL</th>
+                  <th>Cuenta Regresiva TTL</th>
                   <th>Estado</th>
                   <th>Acciones</th>
                 </tr>
@@ -409,6 +411,39 @@
     </div>
   </div>
 
+  <!-- MODAL: EDIT PETAL -->
+  <div id="edit-petal-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>🌺 Modificar Pétalo Semántico</h3>
+        <button class="close-btn" onclick="app.closeModal('edit-petal-modal')">&times;</button>
+      </div>
+      <form onsubmit="app.handleSaveEditPetal(event)">
+        <input type="hidden" id="edit-petal-old-alias">
+        <div class="form-group">
+          <label for="edit-petal-alias">Alias Semántico</label>
+          <input type="text" id="edit-petal-alias" required>
+        </div>
+        <div class="form-group">
+          <label for="edit-petal-secret">Nuevo Secret Real (Dejar en blanco para mantener el actual)</label>
+          <input type="password" id="edit-petal-secret" placeholder="••••••••••••">
+        </div>
+        <div class="form-group">
+          <label for="edit-petal-category">Categoría</label>
+          <input type="text" id="edit-petal-category">
+        </div>
+        <div class="form-group">
+          <label for="edit-petal-desc">Descripción</label>
+          <input type="text" id="edit-petal-desc">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="app.closeModal('edit-petal-modal')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Cambios 🌺</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- MODAL: EDIT TRAP -->
   <div id="edit-trap-modal" class="modal">
     <div class="modal-content">
@@ -423,8 +458,12 @@
           <input type="text" id="edit-trap-alias" required>
         </div>
         <div class="form-group">
-          <label for="edit-trap-file">Archivo Objetivo (Opcional)</label>
-          <input type="text" id="edit-trap-file" placeholder="src/config.js">
+          <label for="edit-trap-file">Repo / Archivo Destino</label>
+          <input type="text" id="edit-trap-file" placeholder="amglogicalis/mi-repo / src/config.js">
+        </div>
+        <div class="form-group">
+          <label for="edit-trap-discord">Discord Webhook URL</label>
+          <input type="url" id="edit-trap-discord" placeholder="https://discord.com/api/webhooks/...">
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" onclick="app.closeModal('edit-trap-modal')">Cancelar</button>
@@ -451,6 +490,10 @@
           <label for="edit-nectar-secret">Nuevo Secret Real (Dejar en blanco para mantener)</label>
           <input type="password" id="edit-nectar-secret" placeholder="••••••••">
         </div>
+        <div class="form-group">
+          <label for="edit-nectar-ttl">TTL en Minutos</label>
+          <input type="number" id="edit-nectar-ttl" value="15">
+        </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" onclick="app.closeModal('edit-nectar-modal')">Cancelar</button>
           <button type="submit" class="btn btn-primary">Guardar Cambios 🏵️</button>
@@ -476,6 +519,21 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-primary" onclick="app.closeModal('reveal-petal-modal')">Cerrar 👁️</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CUSTOM GLASS CONFIRMATION MODAL (#780510 Theme) -->
+  <div id="confirm-modal" class="modal">
+    <div class="modal-content" style="max-width: 440px; border-top: 3px solid var(--primary);">
+      <div class="modal-header">
+        <h3 id="confirm-modal-title">⚠️ Confirmación</h3>
+        <button class="close-btn" onclick="app.closeConfirmModal(false)">&times;</button>
+      </div>
+      <p id="confirm-modal-message" style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.25rem;"></p>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="app.closeConfirmModal(false)">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="confirm-modal-action-btn" onclick="app.closeConfirmModal(true)">Confirmar</button>
       </div>
     </div>
   </div>
@@ -523,6 +581,10 @@
         <div class="form-group">
           <label for="trap-alias">Alias Trampa</label>
           <input type="text" id="trap-alias" placeholder="trap-github-pat" required>
+        </div>
+        <div class="form-group">
+          <label for="trap-target-file">Repo / Archivo Destino</label>
+          <input type="text" id="trap-target-file" placeholder="amglogicalis/mi-app / src/config.js">
         </div>
         <div class="form-group">
           <label for="trap-discord">Discord Webhook URL (Opcional)</label>
