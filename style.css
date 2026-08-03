@@ -1,17 +1,19 @@
-/* SINCHLOR Studio — CSS Stylesheet */
+/* SINCHLOR Studio — CSS Stylesheet (Theme Color: #780510 Crimson Wine) */
 
 :root {
-  --bg: #07090e;
-  --bg-card: rgba(18, 24, 38, 0.7);
-  --bg-input: #0d121f;
+  --bg: #090507;
+  --bg-card: rgba(22, 10, 14, 0.75);
+  --bg-input: #150a0d;
   --border: rgba(255, 255, 255, 0.08);
-  --border-glow: rgba(16, 185, 129, 0.3);
-  --primary: #10b981;          /* Emerald Green */
-  --primary-glow: rgba(16, 185, 129, 0.25);
+  --border-glow: rgba(120, 5, 16, 0.4);
+  --primary: #780510;          /* Deep Sinchlor Crimson Wine */
+  --primary-light: #a30b19;
+  --primary-glow: rgba(120, 5, 16, 0.35);
   --accent-magenta: #c026d3;   /* Sinchlor Parade Magenta */
   --accent-gold: #f59e0b;
+  --accent-green: #10b981;
   --text: #f8fafc;
-  --text-muted: #94a3b8;
+  --text-muted: #a19598;
   --font-sans: 'Outfit', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
@@ -25,8 +27,8 @@
 body {
   background-color: var(--bg);
   background-image: 
-    radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.08) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(192, 38, 211, 0.08) 0px, transparent 50%);
+    radial-gradient(at 0% 0%, rgba(120, 5, 16, 0.18) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(192, 38, 211, 0.12) 0px, transparent 50%);
   color: var(--text);
   font-family: var(--font-sans);
   min-height: 100vh;
@@ -46,7 +48,7 @@ body {
 .login-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(7, 9, 14, 0.95);
+  background: rgba(9, 5, 7, 0.95);
   backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
@@ -59,7 +61,8 @@ body {
   width: 100%;
   max-width: 440px;
   padding: 2rem;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  border-top: 3px solid var(--primary);
 }
 
 .login-header {
@@ -68,8 +71,9 @@ body {
 }
 
 .login-logo {
-  height: 48px;
-  margin-bottom: 0.5rem;
+  height: 56px;
+  margin-bottom: 0.75rem;
+  filter: drop-shadow(0 0 10px rgba(120, 5, 16, 0.5));
 }
 
 .login-header h2 {
@@ -109,8 +113,9 @@ body {
 
 .mode-tab.active {
   background: var(--primary);
-  color: #000;
+  color: #fff;
   font-weight: 600;
+  box-shadow: 0 0 12px var(--primary-glow);
 }
 
 #mode-btn-parade.active {
@@ -145,7 +150,7 @@ body {
 
 .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
   outline: none;
-  border-color: var(--primary);
+  border-color: var(--primary-light);
   box-shadow: 0 0 0 3px var(--primary-glow);
 }
 
@@ -167,11 +172,11 @@ body {
 
 .btn-primary {
   background: var(--primary);
-  color: #000;
+  color: #fff;
 }
 
 .btn-primary:hover {
-  filter: brightness(1.1);
+  background: var(--primary-light);
   box-shadow: 0 0 16px var(--primary-glow);
 }
 
@@ -219,13 +224,14 @@ body {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
 }
 
-.brand-icon {
-  font-size: 1.75rem;
+.brand-icon-img {
+  height: 38px;
+  width: auto;
 }
 
 .brand-title {
@@ -233,6 +239,7 @@ body {
   font-weight: 700;
   font-size: 1.15rem;
   letter-spacing: 0.5px;
+  color: var(--text);
 }
 
 .brand-subtitle {
@@ -271,9 +278,10 @@ body {
 }
 
 .nav-item.active {
-  color: var(--primary);
-  background: rgba(16, 185, 129, 0.1);
+  color: #fff;
+  background: var(--primary);
   font-weight: 600;
+  box-shadow: 0 0 10px var(--primary-glow);
 }
 
 .sidebar-footer {
@@ -299,8 +307,8 @@ body {
 }
 
 .dot.online {
-  background: var(--primary);
-  box-shadow: 0 0 8px var(--primary);
+  background: var(--accent-green);
+  box-shadow: 0 0 8px var(--accent-green);
 }
 
 /* Main Content */
@@ -411,7 +419,7 @@ body {
   background: rgba(255, 255, 255, 0.05);
   padding: 0.2rem 0.4rem;
   border-radius: 4px;
-  color: var(--primary);
+  color: #fca5a5;
 }
 
 /* Badges */
@@ -424,7 +432,8 @@ body {
   font-weight: 600;
 }
 
-.badge-green { background: rgba(16, 185, 129, 0.15); color: var(--primary); }
+.badge-crimson { background: rgba(120, 5, 16, 0.3); color: #fca5a5; border: 1px solid rgba(120, 5, 16, 0.5); }
+.badge-green { background: rgba(16, 185, 129, 0.15); color: var(--accent-green); }
 .badge-magenta { background: rgba(192, 38, 211, 0.15); color: var(--accent-magenta); }
 .badge-gold { background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); }
 
@@ -432,7 +441,7 @@ body {
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.82);
   backdrop-filter: blur(8px);
   display: none;
   align-items: center;
@@ -491,11 +500,11 @@ body {
   padding: 0.75rem 1.25rem;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-left: 4px solid var(--primary);
+  border-left: 4px solid var(--primary-light);
   border-radius: 8px;
   color: var(--text);
   font-size: 0.88rem;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
   animation: slideIn 0.3s ease;
 }
 

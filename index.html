@@ -6,7 +6,7 @@
   <title>🛡️ SINCHLOR Studio — Secrets Camouflage & Credentials Engine</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -25,36 +25,24 @@
         <button id="mode-btn-parade" class="mode-tab" onclick="app.switchLoginMode('parade')">🎪 Sinchlor Parade (Equipo)</button>
       </div>
 
-      <!-- FORM: PERSONAL MODE -->
+      <!-- FORM: PERSONAL MODE (SIMPLIFIED — PAT ONLY!) -->
       <form id="personal-login-form" onsubmit="app.handleConnectPersonal(event)">
         <div class="form-group">
           <label for="login-token">GitHub Personal Access Token (PAT)</label>
           <input type="password" id="login-token" placeholder="ghp_••••••••••••••••••••••••••••••••" required>
         </div>
-        <div class="form-group">
-          <label for="login-vault">Repositorio Bóveda Privado</label>
-          <input type="text" id="login-vault" value=".sinchlor-storage" required>
-        </div>
-        <div class="form-group">
-          <label for="login-pin">PIN / Contraseña Maestra (Cifrado AES-256)</label>
-          <input type="password" id="login-pin" value="sinchlor-master-key" required>
-        </div>
-        <button type="submit" class="btn btn-primary btn-block">Conectar a Bóveda Cápsula 🛡️</button>
+        <button type="submit" class="btn btn-primary btn-block">Conectar Bóveda Personal 🛡️</button>
       </form>
 
-      <!-- FORM: PARADE MODE -->
+      <!-- FORM: PARADE MODE (PARADE NAME + PARADE KEY OR PAT!) -->
       <form id="parade-login-form" onsubmit="app.handleConnectParade(event)" style="display: none;">
         <div class="form-group">
           <label for="parade-name-input">Nombre del Sinchlor Parade</label>
-          <input type="text" id="parade-name-input" placeholder="Frontend Team" required>
+          <input type="text" id="parade-name-input" placeholder="Sinclor Dev Enjambre" required>
         </div>
         <div class="form-group">
-          <label for="parade-key-input">Parade Access Key / PAT de Acceso</label>
-          <input type="password" id="parade-key-input" placeholder="parade_key_••••••••••••" required>
-        </div>
-        <div class="form-group">
-          <label for="parade-token-input">GitHub PAT (para llamadas a Git)</label>
-          <input type="password" id="parade-token-input" placeholder="ghp_••••••••••••••••••••••••••••••••" required>
+          <label for="parade-key-input">Parade Access Key o GitHub PAT de Acceso</label>
+          <input type="password" id="parade-key-input" placeholder="parade_key_•••••••• o ghp_••••••••" required>
         </div>
         <button type="submit" class="btn btn-accent btn-block">Entrar al Desfile de Equipo 🎪</button>
       </form>
@@ -66,7 +54,7 @@
     <!-- SIDEBAR -->
     <aside class="sidebar">
       <div class="brand">
-        <span class="brand-icon">🛡️</span>
+        <img src="assets/logo_sinchlor.png" alt="SINCHLOR" class="brand-icon-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>';">
         <div class="brand-text">
           <span class="brand-title">SINCHLOR</span>
           <span class="brand-subtitle" id="console-mode-subtitle">Personal Vault</span>
@@ -151,7 +139,7 @@
 
         <div class="card glass-panel" style="margin-top: 1.5rem;">
           <div class="card-header">
-            <h3>🌺 Catálogo de Pétalos (AliasesDNS)</h3>
+            <h3>🌺 Catálogo de Pétalos (Aliases DNS)</h3>
           </div>
           <div class="table-responsive">
             <table class="data-table">
