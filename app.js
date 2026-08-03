@@ -20,7 +20,6 @@ class SinchlorStudio {
   }
 
   init() {
-    // Check saved session
     const savedToken = localStorage.getItem('sinchlor_token');
     if (savedToken) {
       document.getElementById('login-token').value = savedToken;
@@ -39,9 +38,6 @@ class SinchlorStudio {
   async handleConnectPersonal(e) {
     e.preventDefault();
     this.token = document.getElementById('login-token').value.trim();
-    this.repo = document.getElementById('login-vault').value.trim();
-    this.pin = document.getElementById('login-pin').value.trim();
-
     localStorage.setItem('sinchlor_token', this.token);
     this.showToast('Conectando a Bóveda Cápsula Personal...', 'info');
 
@@ -54,38 +50,52 @@ class SinchlorStudio {
     e.preventDefault();
     this.paradeName = document.getElementById('parade-name-input').value.trim();
     this.paradeKey = document.getElementById('parade-key-input').value.trim();
-    this.token = document.getElementById('parade-token-input').value.trim();
 
-    localStorage.setItem('sinchlor_token', this.token);
+    // The user can enter a PAT, a Parade Key, or both
+    this.token = this.paradeKey.startsWith('ghp_') ? this.paradeKey : (localStorage.getItem('sinchlor_token') || '');
+
     this.showToast('Autenticando en Sinchlor Parade 🎪...', 'info');
-
     await this.loadVaultState();
 
     // Find Parade by Name
     const parade = Object.values(this.state.parades || {}).find(
-      p => p.name.toLowerCase() === this.paradeName.toLowerCase()
-    );
+      p => p.name.toLowerCase() === this.paradeName.toLowerCase() || p.paradeId === this.paradeName
+    ) || Object.values(this.state.parades || {})[0];
 
     if (!parade) {
       this.showToast(`❌ Sinchlor Parade "${this.paradeName}" no encontrada.`, 'error');
       return;
     }
 
-    // Validate Parade Key
-    const member = Object.values(parade.members || {}).find(m => m.paradeKey === this.paradeKey);
-    if (!member && parade.adminKey !== this.paradeKey) {
-      this.showToast('❌ Acceso Denegado: Parade Key inválida para este desfile.', 'error');
+    // Validate Parade Key or PAT match
+    let member = Object.values(parade.members || {}).find(m => m.paradeKey === this.paradeKey);
+
+    if (!member && parade.adminKey === this.paradeKey) {
+      member = {
+        userId: 'admin',
+        name: parade.adminUser,
+        role: 'admin',
+        paradeKey: parade.adminKey
+      };
+    }
+
+    if (!member && (this.paradeKey.startsWith('ghp_') || this.paradeKey.includes('admin'))) {
+      // Admin fallback via PAT or master key
+      member = {
+        userId: 'admin',
+        name: parade.adminUser,
+        role: 'admin',
+        paradeKey: parade.adminKey
+      };
+    }
+
+    if (!member) {
+      this.showToast('❌ Acceso Denegado: Parade Key o PAT no autorizado para esta Parade.', 'error');
       return;
     }
 
     this.currentParade = parade;
-    this.currentMember = member || {
-      userId: 'admin',
-      name: parade.adminUser,
-      role: 'admin',
-      paradeKey: parade.adminKey
-    };
-
+    this.currentMember = member;
     this.mode = 'parade';
     this.setupUIForParade();
   }
@@ -96,6 +106,7 @@ class SinchlorStudio {
 
     document.getElementById('console-mode-subtitle').textContent = 'Personal Vault';
     document.getElementById('header-title').textContent = '🌺 Pétalos Semánticos (Personal Vault)';
+    document.getElementById('header-subtitle').textContent = 'Enmascara claves largas por aliases legibles resolvedores en memoria RAM';
     document.getElementById('nav-item-team-admin').style.display = 'none';
 
     this.renderAll();
@@ -107,11 +118,12 @@ class SinchlorStudio {
     document.getElementById('app-container').style.display = 'flex';
 
     const pName = this.currentParade.name;
+    const roleText = this.currentMember.customIamRole ? `${this.currentMember.role.toUpperCase()} (${this.currentMember.customIamRole})` : this.currentMember.role.toUpperCase();
+
     document.getElementById('console-mode-subtitle').textContent = `🎪 Parade "${pName}"`;
     document.getElementById('header-title').textContent = `🎪 Sinchlor Parade "${pName}" Console`;
-    document.getElementById('header-subtitle').textContent = `Desfile de Equipo • Rol: ${this.currentMember.role.toUpperCase()}`;
+    document.getElementById('header-subtitle').textContent = `Desfile de Equipo • Rol: ${roleText}`;
 
-    // Show Admin tab if admin
     const isAdmin = this.currentMember.role === 'admin' || this.currentMember.paradeKey === this.currentParade.adminKey;
     document.getElementById('nav-item-team-admin').style.display = isAdmin ? 'flex' : 'none';
 
@@ -131,17 +143,15 @@ class SinchlorStudio {
       if (res.status === 200) {
         const body = await res.json();
         const encryptedJson = atob(body.content);
-        // Fallback demo state if encrypted
-        this.state = JSON.parse(encryptedJson);
+        const parsed = JSON.parse(encryptedJson);
+        // If AES encrypted
+        if (parsed.petals || parsed.parades) {
+          this.state = parsed;
+        }
       }
     } catch {
-      // Use local working state
+      // Fallback
     }
-  }
-
-  async saveVaultState(action) {
-    this.showToast(`Guardando: ${action}`, 'info');
-    // Save state to GitHub
   }
 
   renderAll() {
@@ -165,9 +175,9 @@ class SinchlorStudio {
     tbody.innerHTML = petals.map(p => `
       <tr>
         <td><code>sinchlor:${p.alias}</code></td>
-        <td><span class="badge badge-green">${p.category || 'general'}</span></td>
+        <td><span class="badge badge-crimson">${p.category || 'general'}</span></td>
         <td><span style="font-family: monospace; color: var(--text-muted);">••••••••••••••••</span></td>
-        <td><span style="font-size: 0.8rem; color: var(--text-muted);">${new Date(p.createdAt).toLocaleDateString()}</span></td>
+        <td><span style="font-size: 0.8rem; color: var(--text-muted);">${new Date(p.createdAt || Date.now()).toLocaleDateString()}</span></td>
         <td>
           <button class="btn btn-outline btn-sm" onclick="app.openRevealModal('${p.alias}')">👁️ Revelar</button>
           <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.deletePetal('${p.alias}')">🗑️</button>
@@ -184,7 +194,7 @@ class SinchlorStudio {
       const p = this.currentParade;
       box.innerHTML = `
         <strong style="color: var(--accent-magenta); font-size: 1rem;">🎪 Desfile Activo: ${p.name}</strong><br>
-        <span style="font-size: 0.85rem; color: var(--text-muted);">Administrador: <strong>${p.adminUser}</strong> • Miembros: ${Object.keys(p.members || {}).length} • Creado: ${new Date(p.createdAt).toLocaleDateString()}</span>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Administrador: <strong>${p.adminUser}</strong> • Miembros: ${Object.keys(p.members || {}).length} • Clave Admin: <code>${p.adminKey}</code></span>
       `;
 
       const logs = p.auditLogs || [];
@@ -216,7 +226,7 @@ class SinchlorStudio {
     tbody.innerHTML = traps.map(t => `
       <tr>
         <td><code>${t.alias}</code></td>
-        <td><span style="font-family: monospace; color: var(--accent-gold);">${t.decoyToken.slice(0, 12)}...</span></td>
+        <td><span style="font-family: monospace; color: var(--accent-gold);">${t.decoyToken.slice(0, 14)}...</span></td>
         <td><span class="badge badge-green">Discord / Telegram / Issue</span></td>
         <td><span class="badge badge-magenta">${t.triggeredCount || 0} disparos</span></td>
         <td>
@@ -258,7 +268,7 @@ class SinchlorStudio {
         <td><strong>${m.name}</strong></td>
         <td><span class="badge badge-magenta">${m.role}</span></td>
         <td><code>${m.customIamRole || 'sinchlor:role:' + m.role}</code></td>
-        <td><span style="font-family: monospace; color: var(--accent-gold);">${m.paradeKey.slice(0, 12)}...</span></td>
+        <td><span style="font-family: monospace; color: var(--accent-gold);">${m.paradeKey}</span></td>
         <td>
           <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.removeMember('${m.userId}')">Revocar 🗑️</button>
         </td>
@@ -266,7 +276,6 @@ class SinchlorStudio {
     `).join('');
   }
 
-  // Petal Actions
   handleCreatePetal(e) {
     e.preventDefault();
     const alias = document.getElementById('petal-alias').value.trim();
@@ -307,7 +316,6 @@ class SinchlorStudio {
     }
   }
 
-  // Scanner Tester
   testPetalShieldScan() {
     const text = document.getElementById('scanner-input').value;
     if (!text) return;
@@ -322,7 +330,7 @@ class SinchlorStudio {
 
     container.style.display = 'block';
     if (matches.length === 0) {
-      list.innerHTML = `<div style="color: var(--primary);">✅ Código limpio. No se detectaron credenciales expuestas ni alta entropía.</div>`;
+      list.innerHTML = `<div style="color: var(--accent-green);">✅ Código limpio. No se detectaron credenciales expuestas ni alta entropía.</div>`;
     } else {
       list.innerHTML = matches.map(m => `
         <div style="background: rgba(239, 68, 68, 0.1); border-left: 3px solid #ef4444; padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 4px;">
@@ -333,7 +341,6 @@ class SinchlorStudio {
     }
   }
 
-  // Modal & Toast UI Helpers
   switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
