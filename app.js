@@ -101,7 +101,7 @@ class SinchlorStudio {
     }
   }
 
-  // RESOURCE ISOLATION HELPERS
+  // TOTAL RESOURCE ISOLATION: Personal Vault vs Parade Vault
   getActivePetals() {
     if (this.mode === 'parade' && this.currentParade) {
       if (!this.currentParade.petals) this.currentParade.petals = {};
@@ -213,6 +213,10 @@ class SinchlorStudio {
     }
 
     this.currentParade = parade;
+    if (!this.currentParade.petals) this.currentParade.petals = {};
+    if (!this.currentParade.traps) this.currentParade.traps = {};
+    if (!this.currentParade.nectars) this.currentParade.nectars = {};
+
     this.currentMember = member;
     this.mode = 'parade';
     this.setupUIForParade();
@@ -242,7 +246,11 @@ class SinchlorStudio {
     document.getElementById('header-title').textContent = `🎪 Sinchlor Parade "${pName}" Console`;
     document.getElementById('header-subtitle').textContent = `Desfile de Equipo • Rol: ${roleText}`;
 
-    const isAdmin = this.currentMember.role === 'admin' || this.currentMember.paradeKey === this.currentParade.adminKey;
+    // STRICT TEAM MANAGEMENT ACCESSIBILITY (ONLY ADMINS OR ROLES WITH ADMIN PERMISSION)
+    const isAdmin = this.currentMember.role === 'admin' ||
+                    this.currentMember.paradeKey === this.currentParade.adminKey ||
+                    (this.currentMember.customIamRole && (this.currentMember.customIamRole.includes('AWSAdmin') || this.currentMember.customIamRole.includes('admin')));
+
     document.getElementById('nav-item-team-admin').style.display = isAdmin ? 'flex' : 'none';
 
     this.renderAll();
@@ -265,6 +273,17 @@ class SinchlorStudio {
         const parsedRaw = JSON.parse(encryptedJsonStr);
 
         this.state = await this.decryptVaultInBrowser(parsedRaw, this.pin);
+
+        // Re-sync currentParade if active in Parade Mode
+        if (this.mode === 'parade' && this.currentParade) {
+          const freshParade = this.state.parades[this.currentParade.paradeId] || Object.values(this.state.parades)[0];
+          if (freshParade) {
+            this.currentParade = freshParade;
+            if (!this.currentParade.petals) this.currentParade.petals = {};
+            if (!this.currentParade.traps) this.currentParade.traps = {};
+            if (!this.currentParade.nectars) this.currentParade.nectars = {};
+          }
+        }
       }
     } catch (err) {
       console.warn('Could not load remote vault.json:', err);
@@ -323,44 +342,85 @@ class SinchlorStudio {
       this.showToast(`🔮 Exportando política '${policyName}' a Lumina (${sanctName})...`, 'info');
       
       let sha = undefined;
-      const getRes = await fetch(`https://api.github.com/repos/amglogicalis/.lumina-storage/contents/vault.json`, {
+      let existingLuminaState = {
+        version: '1.1.0',
+        activeSanct: sanctName,
+        sancts: {
+          [sanctName]: {
+            sanctId: `sanct_${sanctName}`,
+            name: sanctName,
+            description: `Entorno ${sanctName}`,
+            createdAt: new Date().toISOString(),
+            users: {},
+            policies: {},
+            roles: {},
+            groupMappings: {},
+            activeSessions: {},
+            glowwormLogs: []
+          }
+        },
+        users: {},
+        policies: {},
+        roles: {}
+      };
+
+      // FETCH LUMINA.JSON DIRECTLY (Format expected by Lumina Web Console!)
+      const getRes = await fetch(`https://api.github.com/repos/amglogicalis/.lumina-storage/contents/lumina.json`, {
         headers: { 'Authorization': `Bearer ${this.token}`, 'Accept': 'application/vnd.github.v3+json' }
       });
+
       if (getRes.status === 200) {
         const b = await getRes.json();
         sha = b.sha;
+        try {
+          const content = atob(b.content.replace(/\s/g, ''));
+          existingLuminaState = JSON.parse(content);
+        } catch {}
       }
 
-      const luminaState = {
-        version: '1.1.0',
-        sancts: {
-          [sanctName]: {
-            sanctId: sanctName,
-            name: sanctName,
-            policies: {
-              [policyName]: {
-                policyId: `pol_${Date.now()}`,
-                name: policyName,
-                statements: policyJson.Statement || [],
-                provider: 'terra',
-                createdAt: new Date().toISOString()
-              }
-            }
-          }
-        }
+      if (!existingLuminaState.sancts) existingLuminaState.sancts = {};
+      if (!existingLuminaState.sancts[sanctName]) {
+        existingLuminaState.sancts[sanctName] = {
+          sanctId: `sanct_${sanctName}`,
+          name: sanctName,
+          description: `Entorno ${sanctName}`,
+          createdAt: new Date().toISOString(),
+          users: {},
+          policies: {},
+          roles: {},
+          groupMappings: {},
+          activeSessions: {},
+          glowwormLogs: []
+        };
+      }
+
+      const policyId = policyName.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+
+      existingLuminaState.sancts[sanctName].policies = existingLuminaState.sancts[sanctName].policies || {};
+      existingLuminaState.sancts[sanctName].policies[policyId] = {
+        policyId: policyId,
+        name: policyName,
+        description: `Exported from Sinchlor Parade for ${sanctName}`,
+        statements: policyJson.Statement || [],
+        provider: 'terra',
+        createdAt: new Date().toISOString()
       };
 
-      await fetch(`https://api.github.com/repos/amglogicalis/.lumina-storage/contents/vault.json`, {
+      // Also sync top level
+      existingLuminaState.policies = existingLuminaState.sancts[sanctName].policies;
+
+      // Save lumina.json for Lumina Web Console
+      await fetch(`https://api.github.com/repos/amglogicalis/.lumina-storage/contents/lumina.json`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: `🔮 Lumina Policy: Export ${policyName} from Sinchlor`,
-          content: btoa(JSON.stringify(luminaState, null, 2)),
+          message: `🔮 Lumina Policy: Export ${policyName} (${policyId}) to lumina.json in Sanct ${sanctName}`,
+          content: btoa(JSON.stringify(existingLuminaState, null, 2)),
           sha
         })
       });
 
-      this.showToast(`✅ Política exportada a Lumina (Sanct: ${sanctName})!`, 'success');
+      this.showToast(`✅ Política '${policyName}' exportada a lumina.json (Sanct: ${sanctName})!`, 'success');
     } catch (err) {
       console.warn('Export to Lumina error:', err);
     }
@@ -624,7 +684,7 @@ class SinchlorStudio {
           <td>${roleBadge}</td>
           <td><span style="font-family: monospace; color: var(--accent-gold);">${m.paradeKey}</span></td>
           <td>
-            <button class="btn btn-outline btn-sm" onclick="app.openEditMemberModal('${m.userId}')">✏️ Editar</button>
+            <button class="btn btn-outline btn-sm" onclick="app.openEditMemberModal('${m.userId}')">✏️ Editar / Reset Key</button>
             <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.confirmRemoveMember('${m.userId}')">Revocar 🗑️</button>
           </td>
         </tr>
@@ -640,10 +700,11 @@ class SinchlorStudio {
     document.getElementById(`${prefix}-group-custom`).style.display = provider === 'custom_json' ? 'block' : 'none';
   }
 
-  // 🎪 PARADE MEMBER MANAGEMENT
+  // 🎪 PARADE MEMBER MANAGEMENT (WITH CUSTOM PARADE KEY & PASSWORD RESET)
   async handleInviteMember(e) {
     e.preventDefault();
     const userName = document.getElementById('invite-user-name').value.trim();
+    const customKey = document.getElementById('invite-custom-parade-key')?.value.trim();
     const provider = document.getElementById('invite-role-provider').value;
 
     let role = 'viewer';
@@ -679,7 +740,7 @@ class SinchlorStudio {
     if (!this.currentParade) return;
 
     const userId = `user_${Date.now().toString(36)}`;
-    const paradeKey = `parade_key_${role}_${Math.random().toString(36).slice(2, 10)}`;
+    const paradeKey = customKey || `parade_key_${role}_${Math.random().toString(36).slice(2, 10)}`;
 
     const newMember = {
       userId,
@@ -696,7 +757,7 @@ class SinchlorStudio {
 
     this.closeModal('invite-member-modal');
     await this.saveVaultState(`Invitado miembro ${userName} (${role})`);
-    this.showToast(`Miembro '${userName}' invitado! Key: ${paradeKey}`, 'success');
+    this.showToast(`Miembro '${userName}' invitado con Parade Key: ${paradeKey}`, 'success');
     this.renderAll();
   }
 
@@ -706,6 +767,7 @@ class SinchlorStudio {
     const m = this.currentParade.members[userId];
     document.getElementById('edit-member-id').value = userId;
     document.getElementById('edit-member-name').value = m.name;
+    document.getElementById('edit-custom-parade-key').value = m.paradeKey || '';
 
     const provider = m.provider || (m.customIamRole ? 'lumina_role' : 'sinchlor_native');
     document.getElementById('edit-role-provider').value = provider;
@@ -726,6 +788,7 @@ class SinchlorStudio {
     e.preventDefault();
     const userId = document.getElementById('edit-member-id').value;
     const name = document.getElementById('edit-member-name').value.trim();
+    const customKey = document.getElementById('edit-custom-parade-key').value.trim();
     const provider = document.getElementById('edit-role-provider').value;
 
     let role = 'viewer';
@@ -760,13 +823,14 @@ class SinchlorStudio {
     if (this.currentParade && this.currentParade.members[userId]) {
       const m = this.currentParade.members[userId];
       m.name = name;
+      if (customKey) m.paradeKey = customKey;
       m.role = role;
       m.provider = provider;
       m.customIamRole = customIamRole;
 
       this.closeModal('edit-member-modal');
-      await this.saveVaultState(`Modificado miembro ${name}`);
-      this.showToast(`Miembro '${name}' modificado con éxito. ✏️`, 'success');
+      await this.saveVaultState(`Modificado miembro ${name} y actualizada Parade Key`);
+      this.showToast(`Miembro '${name}' modificado y Parade Key actualizada. ✏️`, 'success');
       this.renderAll();
     }
   }

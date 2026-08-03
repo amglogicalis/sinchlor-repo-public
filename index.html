@@ -692,9 +692,15 @@
           </div>
         </div>
 
+        <!-- Parade Key Custom Input -->
+        <div class="form-group">
+          <label for="invite-custom-parade-key">Parade Access Key / Contraseña</label>
+          <input type="text" id="invite-custom-parade-key" placeholder="Dejar en blanco para auto-generar clave aleatoria">
+        </div>
+
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" onclick="app.closeModal('invite-member-modal')">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Generar Parade Key 🔑</button>
+          <button type="submit" class="btn btn-primary">Guardar e Invitar Miembro 🔑</button>
         </div>
       </form>
     </div>
@@ -712,6 +718,11 @@
         <div class="form-group">
           <label for="edit-member-name">Nombre del Usuario</label>
           <input type="text" id="edit-member-name" required>
+        </div>
+
+        <div class="form-group">
+          <label for="edit-custom-parade-key">Parade Access Key / Contraseña</label>
+          <input type="text" id="edit-custom-parade-key" placeholder="Permite restablecer o cambiar la clave de acceso del usuario" required>
         </div>
 
         <div class="form-group">
