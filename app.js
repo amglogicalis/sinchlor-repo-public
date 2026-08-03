@@ -101,6 +101,97 @@ class SinchlorStudio {
     }
   }
 
+  // 🛡️ FULL DECLARATIVE JSON POLICY ENGINE FOR WEB CONSOLE
+  canUserExecuteAction(requiredAction) {
+    if (this.mode !== 'parade') return true; // Full access in Personal Mode
+    if (!this.currentMember) return false;
+
+    const member = this.currentMember;
+    const role = member.role;
+    const customIamRole = member.customIamRole || '';
+
+    // 1. Admin native role or parade creator
+    if (role === 'admin' || member.paradeKey === this.currentParade?.adminKey || member.name === this.currentParade?.adminUser) {
+      return true;
+    }
+
+    // 2. Native Editor Role
+    if (role === 'editor') {
+      const editorDenied = ['sinchlor:parade:admin', 'sinchlor:parade:read_members'];
+      if (editorDenied.includes(requiredAction)) return false;
+      return true;
+    }
+
+    // 3. Native Viewer Role
+    if (role === 'viewer') {
+      const viewerAllowed = ['sinchlor:petals:read', 'sinchlor:nectar:consume', 'sinchlor:traps:read'];
+      return viewerAllowed.includes(requiredAction);
+    }
+
+    // 4. Custom IAM / Lumina / AWS Policy Declarations
+    let statements = [];
+
+    // Pre-made AWS / Lumina / Sinchlor Policies Mapping
+    if (customIamRole.includes('AWSAdminView')) {
+      statements = [
+        { Effect: 'Allow', Action: ['sinchlor:petals:read', 'sinchlor:petals:reveal', 'sinchlor:nectar:*', 'sinchlor:parade:admin'], Resource: '*' },
+        { Effect: 'Deny', Action: ['sinchlor:petals:write', 'sinchlor:traps:write'], Resource: '*' }
+      ];
+    } else if (customIamRole.includes('NativeNectar_Only')) {
+      statements = [
+        { Effect: 'Allow', Action: ['sinchlor:nectar:create', 'sinchlor:nectar:consume', 'sinchlor:petals:read'], Resource: '*' },
+        { Effect: 'Deny', Action: ['sinchlor:petals:reveal', 'sinchlor:petals:write', 'sinchlor:traps:*', 'sinchlor:parade:admin'], Resource: '*' }
+      ];
+    } else if (customIamRole.includes('traps_auditor')) {
+      statements = [
+        { Effect: 'Allow', Action: ['sinchlor:traps:read', 'sinchlor:traps:write', 'sinchlor:traps:trigger', 'sinchlor:nectar:consume', 'sinchlor:petals:read'], Resource: '*' },
+        { Effect: 'Deny', Action: ['sinchlor:petals:reveal', 'sinchlor:petals:write', 'sinchlor:nectar:create', 'sinchlor:parade:admin'], Resource: '*' }
+      ];
+    } else if (customIamRole.includes('TerraDevOps') || customIamRole.includes('DevOps')) {
+      statements = [
+        { Effect: 'Allow', Action: ['sinchlor:petals:read', 'sinchlor:petals:reveal', 'sinchlor:nectar:*'], Resource: '*' },
+        { Effect: 'Deny', Action: ['sinchlor:petals:write', 'sinchlor:traps:write', 'sinchlor:parade:admin'], Resource: '*' }
+      ];
+    } else {
+      // Default fallback for custom IAM
+      statements = [
+        { Effect: 'Allow', Action: ['sinchlor:petals:read', 'sinchlor:nectar:consume'], Resource: '*' }
+      ];
+    }
+
+    return this.evaluatePolicyStatements(statements, requiredAction);
+  }
+
+  evaluatePolicyStatements(statements, requiredAction) {
+    const actionMatches = (pattern, action) => {
+      if (pattern === '*' || pattern === 'sinchlor:*') return true;
+      const regexPattern = '^' + pattern.replace(/\*/g, '.*') + '$';
+      return new RegExp(regexPattern).test(action);
+    };
+
+    // Explicit Deny takes absolute precedence
+    for (const stmt of statements) {
+      if (stmt.Effect === 'Deny') {
+        const deniedActions = Array.isArray(stmt.Action) ? stmt.Action : [stmt.Action];
+        for (const pattern of deniedActions) {
+          if (actionMatches(pattern, requiredAction)) return false;
+        }
+      }
+    }
+
+    // Check Allow
+    for (const stmt of statements) {
+      if (stmt.Effect === 'Allow') {
+        const allowedActions = Array.isArray(stmt.Action) ? stmt.Action : [stmt.Action];
+        for (const pattern of allowedActions) {
+          if (actionMatches(pattern, requiredAction)) return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   // TOTAL RESOURCE ISOLATION: Personal Vault vs Parade Vault
   getActivePetals() {
     if (this.mode === 'parade' && this.currentParade) {
@@ -159,8 +250,12 @@ class SinchlorStudio {
     localStorage.setItem('sinchlor_token', this.token);
     this.showToast('Conectando a Bóveda Cápsula Personal...', 'info');
 
-    await this.loadVaultState();
+    // STRICT CLEANUP OF PARADE STATE IN PERSONAL MODE
     this.mode = 'personal';
+    this.currentParade = null;
+    this.currentMember = null;
+
+    await this.loadVaultState();
     this.setupUIForPersonal();
   }
 
@@ -246,12 +341,9 @@ class SinchlorStudio {
     document.getElementById('header-title').textContent = `🎪 Sinchlor Parade "${pName}" Console`;
     document.getElementById('header-subtitle').textContent = `Desfile de Equipo • Rol: ${roleText}`;
 
-    // STRICT TEAM MANAGEMENT ACCESSIBILITY (ONLY ADMINS OR ROLES WITH ADMIN PERMISSION)
-    const isAdmin = this.currentMember.role === 'admin' ||
-                    this.currentMember.paradeKey === this.currentParade.adminKey ||
-                    (this.currentMember.customIamRole && (this.currentMember.customIamRole.includes('AWSAdmin') || this.currentMember.customIamRole.includes('admin')));
-
-    document.getElementById('nav-item-team-admin').style.display = isAdmin ? 'flex' : 'none';
+    // STRICT TEAM MANAGEMENT ACCESSIBILITY (EVALUATES sinchlor:parade:admin)
+    const canAdminTeam = this.canUserExecuteAction('sinchlor:parade:admin');
+    document.getElementById('nav-item-team-admin').style.display = canAdminTeam ? 'flex' : 'none';
 
     this.renderAll();
     this.showToast(`¡Bienvenido al Sinchlor Parade "${pName}"! 🎪`, 'success');
@@ -491,11 +583,19 @@ class SinchlorStudio {
   enforceRoleCapabilities() {
     if (this.mode !== 'parade' || !this.currentMember) return;
 
-    const isViewer = this.currentMember.role === 'viewer';
-    
-    // Hide write/create buttons for Viewers
-    document.querySelectorAll('.btn-action-write').forEach(btn => {
-      btn.style.display = isViewer ? 'none' : 'inline-block';
+    const canWritePetals = this.canUserExecuteAction('sinchlor:petals:write');
+    const canCreateNectar = this.canUserExecuteAction('sinchlor:nectar:create');
+    const canWriteTraps = this.canUserExecuteAction('sinchlor:traps:write');
+
+    // Hide create/write buttons if user's policy forbids it
+    document.querySelectorAll('.btn-action-write-petals').forEach(btn => {
+      btn.style.display = canWritePetals ? 'inline-block' : 'none';
+    });
+    document.querySelectorAll('.btn-action-create-nectar').forEach(btn => {
+      btn.style.display = canCreateNectar ? 'inline-block' : 'none';
+    });
+    document.querySelectorAll('.btn-action-create-trap').forEach(btn => {
+      btn.style.display = canWriteTraps ? 'inline-block' : 'none';
     });
   }
 
@@ -524,15 +624,16 @@ class SinchlorStudio {
       return;
     }
 
-    const isViewer = this.mode === 'parade' && this.currentMember?.role === 'viewer';
+    const canReveal = this.canUserExecuteAction('sinchlor:petals:reveal');
+    const canWrite = this.canUserExecuteAction('sinchlor:petals:write');
 
     tbody.innerHTML = petals.slice(0, 5).map(p => `
       <tr>
         <td><code>sinchlor:${p.alias}</code></td>
         <td><span class="badge badge-crimson">${p.category || 'general'}</span></td>
         <td>
-          <button class="btn btn-outline btn-sm" onclick="app.openRevealModal('${p.alias}')">👁️ Revelar</button>
-          ${isViewer ? '' : `<button class="btn btn-outline btn-sm" onclick="app.openEditPetalModal('${p.alias}')">✏️ Editar</button>`}
+          ${canReveal ? `<button class="btn btn-outline btn-sm" onclick="app.openRevealModal('${p.alias}')">👁️ Revelar</button>` : '<span class="badge badge-magenta">🔒 Revelar Denegado</span>'}
+          ${canWrite ? `<button class="btn btn-outline btn-sm" onclick="app.openEditPetalModal('${p.alias}')">✏️ Editar</button>` : ''}
         </td>
       </tr>
     `).join('');
@@ -548,7 +649,8 @@ class SinchlorStudio {
       return;
     }
 
-    const isViewer = this.mode === 'parade' && this.currentMember?.role === 'viewer';
+    const canReveal = this.canUserExecuteAction('sinchlor:petals:reveal');
+    const canWrite = this.canUserExecuteAction('sinchlor:petals:write');
 
     tbody.innerHTML = petals.map(p => `
       <tr>
@@ -557,11 +659,11 @@ class SinchlorStudio {
         <td><span style="font-family: monospace; color: var(--text-muted);">••••••••••••••••</span></td>
         <td><span style="font-size: 0.8rem; color: var(--text-muted);">${new Date(p.createdAt || Date.now()).toLocaleDateString()}</span></td>
         <td>
-          <button class="btn btn-outline btn-sm" onclick="app.openRevealModal('${p.alias}')">👁️ Revelar</button>
-          ${isViewer ? '' : `
+          ${canReveal ? `<button class="btn btn-outline btn-sm" onclick="app.openRevealModal('${p.alias}')">👁️ Revelar</button>` : '<span class="badge badge-magenta">🔒 Sin permiso de revelado</span>'}
+          ${canWrite ? `
             <button class="btn btn-outline btn-sm" onclick="app.openEditPetalModal('${p.alias}')">✏️ Editar</button>
             <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.confirmDeletePetal('${p.alias}')">🗑️</button>
-          `}
+          ` : ''}
         </td>
       </tr>
     `).join('');
@@ -604,7 +706,8 @@ class SinchlorStudio {
       return;
     }
 
-    const isViewer = this.mode === 'parade' && this.currentMember?.role === 'viewer';
+    const canTrigger = this.canUserExecuteAction('sinchlor:traps:trigger');
+    const canWriteTraps = this.canUserExecuteAction('sinchlor:traps:write');
 
     tbody.innerHTML = traps.map(t => {
       const channels = [];
@@ -622,12 +725,12 @@ class SinchlorStudio {
           <td><span class="badge badge-green">${channels.join(' • ') || 'Nativa'}</span></td>
           <td><span class="badge badge-magenta">${t.triggeredCount || 0} disparos</span></td>
           <td>
-            ${isViewer ? '<span class="badge badge-gold">Solo Lectura</span>' : `
-              <button class="btn btn-outline btn-sm" onclick="app.triggerTrap('${t.trapId}')">🔥 Probar</button>
+            ${canTrigger ? `<button class="btn btn-outline btn-sm" onclick="app.triggerTrap('${t.trapId}')">🔥 Probar</button>` : ''}
+            ${canWriteTraps ? `
               <button class="btn btn-outline btn-sm" onclick="app.recreateTrap('${t.trapId}')">🔄 Recrear</button>
               <button class="btn btn-outline btn-sm" onclick="app.openEditTrapModal('${t.trapId}')">✏️ Editar</button>
               <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.confirmDeleteTrap('${t.trapId}')">🗑️</button>
-            `}
+            ` : (!canTrigger ? '<span class="badge badge-gold">Solo Lectura</span>' : '')}
           </td>
         </tr>
       `;
@@ -643,7 +746,8 @@ class SinchlorStudio {
       return;
     }
 
-    const isViewer = this.mode === 'parade' && this.currentMember?.role === 'viewer';
+    const canConsume = this.canUserExecuteAction('sinchlor:nectar:consume');
+    const canCreateNectar = this.canUserExecuteAction('sinchlor:nectar:create');
 
     tbody.innerHTML = nectars.map(n => `
       <tr>
@@ -656,11 +760,11 @@ class SinchlorStudio {
         </td>
         <td><span class="badge ${n.used ? 'badge-magenta' : 'badge-green'}">${n.used ? 'Consumido' : 'Disponible'}</span></td>
         <td>
-          <button class="btn btn-outline btn-sm" onclick="app.consumeNectar('${n.nectarId}')" ${n.used ? 'disabled' : ''}>🏵️ Consumir</button>
-          ${isViewer ? '' : `
+          ${canConsume ? `<button class="btn btn-outline btn-sm" onclick="app.consumeNectar('${n.nectarId}')" ${n.used ? 'disabled' : ''}>🏵️ Consumir</button>` : ''}
+          ${canCreateNectar ? `
             <button class="btn btn-outline btn-sm" onclick="app.openEditNectarModal('${n.nectarId}')">✏️ Editar</button>
             <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.confirmDeleteNectar('${n.nectarId}')">🗑️</button>
-          `}
+          ` : ''}
         </td>
       </tr>
     `).join('');
@@ -700,9 +804,14 @@ class SinchlorStudio {
     document.getElementById(`${prefix}-group-custom`).style.display = provider === 'custom_json' ? 'block' : 'none';
   }
 
-  // 🎪 PARADE MEMBER MANAGEMENT (WITH CUSTOM PARADE KEY & PASSWORD RESET)
+  // 🎪 PARADE MEMBER MANAGEMENT (EVALUATES sinchlor:parade:admin)
   async handleInviteMember(e) {
     e.preventDefault();
+    if (!this.canUserExecuteAction('sinchlor:parade:admin')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política no permite administrar equipo.', 'error');
+      return;
+    }
+
     const userName = document.getElementById('invite-user-name').value.trim();
     const customKey = document.getElementById('invite-custom-parade-key')?.value.trim();
     const provider = document.getElementById('invite-role-provider').value;
@@ -762,6 +871,10 @@ class SinchlorStudio {
   }
 
   openEditMemberModal(userId) {
+    if (!this.canUserExecuteAction('sinchlor:parade:admin')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política no permite administrar equipo.', 'error');
+      return;
+    }
     if (!this.currentParade || !this.currentParade.members[userId]) return;
 
     const m = this.currentParade.members[userId];
@@ -786,6 +899,11 @@ class SinchlorStudio {
 
   async handleSaveEditMember(e) {
     e.preventDefault();
+    if (!this.canUserExecuteAction('sinchlor:parade:admin')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política no permite administrar equipo.', 'error');
+      return;
+    }
+
     const userId = document.getElementById('edit-member-id').value;
     const name = document.getElementById('edit-member-name').value.trim();
     const customKey = document.getElementById('edit-custom-parade-key').value.trim();
@@ -836,6 +954,11 @@ class SinchlorStudio {
   }
 
   async confirmRemoveMember(userId) {
+    if (!this.canUserExecuteAction('sinchlor:parade:admin')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política no permite administrar equipo.', 'error');
+      return;
+    }
+
     const member = this.currentParade?.members[userId];
     if (!member) return;
 
@@ -850,8 +973,13 @@ class SinchlorStudio {
     );
   }
 
-  // 🌺 PETAL ACTIONS & EDIT
+  // 🌺 PETAL ACTIONS & EDIT (EVALUATES sinchlor:petals:write & reveal)
   openEditPetalModal(alias) {
+    if (!this.canUserExecuteAction('sinchlor:petals:write')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política deniega modificar pétalos.', 'error');
+      return;
+    }
+
     const petals = this.getActivePetals();
     const petal = petals[alias];
     if (!petal) return;
@@ -866,6 +994,11 @@ class SinchlorStudio {
 
   async handleSaveEditPetal(e) {
     e.preventDefault();
+    if (!this.canUserExecuteAction('sinchlor:petals:write')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política deniega modificar pétalos (sinchlor:petals:write).', 'error');
+      return;
+    }
+
     const oldAlias = document.getElementById('edit-petal-old-alias').value;
     const newAlias = document.getElementById('edit-petal-alias').value.trim().replace(/^\[?sinchlor:/, '').replace(/\]$/, '');
     const category = document.getElementById('edit-petal-category').value.trim() || 'general';
@@ -896,6 +1029,11 @@ class SinchlorStudio {
   }
 
   async confirmDeletePetal(alias) {
+    if (!this.canUserExecuteAction('sinchlor:petals:write')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política deniega eliminar pétalos.', 'error');
+      return;
+    }
+
     this.openConfirmModal(
       `¿Deseas eliminar el pétalo semántico 'sinchlor:${alias}'?`,
       async () => {
@@ -910,6 +1048,11 @@ class SinchlorStudio {
 
   // 🌸 PETALTRAPS ACTIONS
   async triggerTrap(trapId) {
+    if (!this.canUserExecuteAction('sinchlor:traps:trigger') && !this.canUserExecuteAction('sinchlor:traps:write')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política deniega probar PetalTraps.', 'error');
+      return;
+    }
+
     const traps = this.getActiveTraps();
     const trap = traps[trapId];
     if (!trap) return;
@@ -924,6 +1067,11 @@ class SinchlorStudio {
   }
 
   async recreateTrap(trapId) {
+    if (!this.canUserExecuteAction('sinchlor:traps:write')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política deniega re-crear PetalTraps.', 'error');
+      return;
+    }
+
     const traps = this.getActiveTraps();
     const trap = traps[trapId];
     if (!trap) return;
@@ -935,6 +1083,11 @@ class SinchlorStudio {
   }
 
   openEditTrapModal(trapId) {
+    if (!this.canUserExecuteAction('sinchlor:traps:write')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política deniega modificar PetalTraps.', 'error');
+      return;
+    }
+
     const traps = this.getActiveTraps();
     const trap = traps[trapId];
     if (!trap) return;
@@ -960,6 +1113,11 @@ class SinchlorStudio {
 
   async handleSaveEditTrap(e) {
     e.preventDefault();
+    if (!this.canUserExecuteAction('sinchlor:traps:write')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política deniega modificar PetalTraps.', 'error');
+      return;
+    }
+
     const trapId = document.getElementById('edit-trap-id').value;
     const alias = document.getElementById('edit-trap-alias').value.trim();
     const fullLoc = document.getElementById('edit-trap-location').value.trim();
@@ -1008,6 +1166,11 @@ class SinchlorStudio {
   }
 
   async confirmDeleteTrap(trapId) {
+    if (!this.canUserExecuteAction('sinchlor:traps:write')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política deniega eliminar PetalTraps.', 'error');
+      return;
+    }
+
     const traps = this.getActiveTraps();
     const trap = traps[trapId];
     if (!trap) return;
@@ -1025,6 +1188,11 @@ class SinchlorStudio {
 
   // 🏵️ NECTAR EFIMERO ACTIONS
   async consumeNectar(nectarId) {
+    if (!this.canUserExecuteAction('sinchlor:nectar:consume')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política deniega consumir néctar.', 'error');
+      return;
+    }
+
     const nectars = this.getActiveNectars();
     const nectar = nectars[nectarId];
     if (!nectar) return;
@@ -1047,6 +1215,11 @@ class SinchlorStudio {
   }
 
   openEditNectarModal(nectarId) {
+    if (!this.canUserExecuteAction('sinchlor:nectar:create')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política deniega modificar néctar.', 'error');
+      return;
+    }
+
     const nectars = this.getActiveNectars();
     const nectar = nectars[nectarId];
     if (!nectar) return;
@@ -1062,6 +1235,11 @@ class SinchlorStudio {
 
   async handleSaveEditNectar(e) {
     e.preventDefault();
+    if (!this.canUserExecuteAction('sinchlor:nectar:create')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política deniega modificar néctar.', 'error');
+      return;
+    }
+
     const nectarId = document.getElementById('edit-nectar-id').value;
     const alias = document.getElementById('edit-nectar-alias').value.trim();
     const secret = document.getElementById('edit-nectar-secret').value.trim();
@@ -1093,6 +1271,11 @@ class SinchlorStudio {
   }
 
   async confirmDeleteNectar(nectarId) {
+    if (!this.canUserExecuteAction('sinchlor:nectar:create')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política deniega eliminar néctar.', 'error');
+      return;
+    }
+
     const nectars = this.getActiveNectars();
     const nectar = nectars[nectarId];
     if (!nectar) return;
@@ -1111,6 +1294,11 @@ class SinchlorStudio {
   // 🌺 PETAL CREATION
   async handleCreatePetal(e) {
     e.preventDefault();
+    if (!this.canUserExecuteAction('sinchlor:petals:write')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política deniega crear pétalos (sinchlor:petals:write).', 'error');
+      return;
+    }
+
     const alias = document.getElementById('petal-alias').value.trim();
     const secret = document.getElementById('petal-secret').value.trim();
     const category = document.getElementById('petal-category').value.trim() || 'general';
@@ -1136,6 +1324,11 @@ class SinchlorStudio {
   }
 
   openRevealModal(alias) {
+    if (!this.canUserExecuteAction('sinchlor:petals:reveal')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política deniega revelar secretos (sinchlor:petals:reveal).', 'error');
+      return;
+    }
+
     const petals = this.getActivePetals();
     const petal = petals[alias];
     if (!petal) return;
@@ -1149,6 +1342,11 @@ class SinchlorStudio {
   // 🌸 PETALTRAP CREATION
   async handleCreateTrap(e) {
     e.preventDefault();
+    if (!this.canUserExecuteAction('sinchlor:traps:write')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política deniega plantar PetalTraps.', 'error');
+      return;
+    }
+
     const alias = document.getElementById('trap-alias').value.trim();
     const entityType = document.getElementById('trap-entity-type').value;
     const fullLoc = document.getElementById('trap-target-location').value.trim();
@@ -1206,6 +1404,11 @@ class SinchlorStudio {
 
   async handleCreateNectar(e) {
     e.preventDefault();
+    if (!this.canUserExecuteAction('sinchlor:nectar:create')) {
+      this.showToast('✖ Acceso Denegado (403): Tu política deniega emitir néctar (sinchlor:nectar:create).', 'error');
+      return;
+    }
+
     const alias = document.getElementById('nectar-alias').value.trim();
     const secret = document.getElementById('nectar-secret').value.trim();
     const ttlMins = parseInt(document.getElementById('nectar-ttl').value || '15', 10);

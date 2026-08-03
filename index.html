@@ -149,9 +149,9 @@
             <h3>⚡ Accesos Rápidos</h3>
           </div>
           <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-            <button class="btn btn-primary btn-action-write" onclick="app.openModal('create-petal-modal')">🌺 Nuevo Pétalo Semántico</button>
-            <button class="btn btn-outline btn-action-write" onclick="app.openModal('create-trap-modal')">🌸 Plantar PetalTrap</button>
-            <button class="btn btn-outline btn-action-write" onclick="app.openModal('create-nectar-modal')">🏵️ Emitir Néctar Efímero</button>
+            <button class="btn btn-primary btn-action-write-petals" onclick="app.openModal('create-petal-modal')">🌺 Nuevo Pétalo Semántico</button>
+            <button class="btn btn-outline btn-action-create-trap" onclick="app.openModal('create-trap-modal')">🌸 Plantar PetalTrap</button>
+            <button class="btn btn-outline btn-action-create-nectar" onclick="app.openModal('create-nectar-modal')">🏵️ Emitir Néctar Efímero</button>
             <button class="btn btn-outline" onclick="app.switchTab('petalshield')">🛡️ Escanear Código (PetalShield)</button>
           </div>
         </div>
@@ -315,7 +315,7 @@
         <div class="card glass-panel">
           <div class="card-header">
             <h3>🏵️ Néctar Efímero (Credenciales TTL & 1-Solo Uso)</h3>
-            <button class="btn btn-outline btn-sm btn-action-write" onclick="app.openModal('create-nectar-modal')">➕ Emitir Néctar 🏵️</button>
+            <button class="btn btn-outline btn-sm btn-action-create-nectar" onclick="app.openModal('create-nectar-modal')">➕ Emitir Néctar 🏵️</button>
           </div>
           <div class="table-responsive">
             <table class="data-table">
