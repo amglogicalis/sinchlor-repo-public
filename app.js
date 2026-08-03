@@ -1,4 +1,4 @@
-// SINCHLOR Studio — Application Logic
+// SINCHLOR Studio — Application Logic (Web Console)
 
 class SinchlorStudio {
   constructor() {
@@ -51,13 +51,17 @@ class SinchlorStudio {
     this.paradeName = document.getElementById('parade-name-input').value.trim();
     this.paradeKey = document.getElementById('parade-key-input').value.trim();
 
-    // The user can enter a PAT, a Parade Key, or both
+    // User can enter PAT, Parade Key, or both
     this.token = this.paradeKey.startsWith('ghp_') ? this.paradeKey : (localStorage.getItem('sinchlor_token') || '');
+
+    if (!this.token) {
+      this.token = this.paradeKey; // fallback
+    }
 
     this.showToast('Autenticando en Sinchlor Parade 🎪...', 'info');
     await this.loadVaultState();
 
-    // Find Parade by Name
+    // Find Parade by Name or ID
     const parade = Object.values(this.state.parades || {}).find(
       p => p.name.toLowerCase() === this.paradeName.toLowerCase() || p.paradeId === this.paradeName
     ) || Object.values(this.state.parades || {})[0];
@@ -80,7 +84,6 @@ class SinchlorStudio {
     }
 
     if (!member && (this.paradeKey.startsWith('ghp_') || this.paradeKey.includes('admin'))) {
-      // Admin fallback via PAT or master key
       member = {
         userId: 'admin',
         name: parade.adminUser,
@@ -142,16 +145,76 @@ class SinchlorStudio {
 
       if (res.status === 200) {
         const body = await res.json();
-        const encryptedJson = atob(body.content);
-        const parsed = JSON.parse(encryptedJson);
-        // If AES encrypted
-        if (parsed.petals || parsed.parades) {
-          this.state = parsed;
-        }
+        const encryptedJsonStr = atob(body.content);
+        const parsedRaw = JSON.parse(encryptedJsonStr);
+
+        // Decrypt AES-256-GCM vault state if encrypted
+        this.state = await this.decryptVaultInBrowser(parsedRaw, this.pin);
       }
-    } catch {
-      // Fallback
+    } catch (err) {
+      console.warn('Could not load remote vault.json:', err);
     }
+  }
+
+  async decryptVaultInBrowser(encryptedObj, pin = 'sinchlor-master-key') {
+    // If state is already plain JSON
+    if (encryptedObj.petals || encryptedObj.parades) {
+      return encryptedObj;
+    }
+
+    try {
+      const enc = new TextEncoder();
+      const pinBuffer = enc.encode(pin);
+      const saltBuffer = enc.encode('sinchlor_salt_v1');
+
+      // 1. Import PBKDF2 Key
+      const keyMaterial = await window.crypto.subtle.importKey(
+        'raw', pinBuffer, { name: 'PBKDF2' }, false, ['deriveKey']
+      );
+
+      // 2. Derive AES-GCM Key (100,000 iterations, SHA-256, 256 bits)
+      const key = await window.crypto.subtle.deriveKey(
+        {
+          name: 'PBKDF2',
+          salt: saltBuffer,
+          iterations: 100000,
+          hash: 'SHA-256'
+        },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['decrypt']
+      );
+
+      // 3. Prepare IV and Ciphertext + AuthTag
+      const hexToBytes = (hex) => new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+      const iv = hexToBytes(encryptedObj.iv);
+      const ciphertextBytes = hexToBytes(encryptedObj.ciphertext);
+      const authTagBytes = hexToBytes(encryptedObj.authTag);
+
+      // Concatenate ciphertext and authTag for Web Crypto API AES-GCM
+      const combined = new Uint8Array(ciphertextBytes.length + authTagBytes.length);
+      combined.set(ciphertextBytes, 0);
+      combined.set(authTagBytes, ciphertextBytes.length);
+
+      // 4. Decrypt
+      const decryptedBuffer = await window.crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: iv },
+        key,
+        combined
+      );
+
+      const decryptedText = new TextDecoder().decode(decryptedBuffer);
+      return JSON.parse(decryptedText);
+    } catch (err) {
+      console.warn('Browser Web Crypto decryption failed:', err);
+      return encryptedObj;
+    }
+  }
+
+  openNewSessionTab() {
+    window.open(window.location.href, '_blank');
+    this.showToast('Abriendo nueva pestaña para otra sesión simultánea 🔀', 'info');
   }
 
   renderAll() {
