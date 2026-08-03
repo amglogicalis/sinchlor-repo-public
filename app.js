@@ -59,6 +59,47 @@ class SinchlorStudio {
     });
   }
 
+  generateRealisticDecoy(entityType) {
+    const randomBase62 = (len) => {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let res = '';
+      for (let i = 0; i < len; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
+      return res;
+    };
+
+    const randomUpperBase36 = (len) => {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let res = '';
+      for (let i = 0; i < len; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
+      return res;
+    };
+
+    switch (entityType) {
+      case 'aws':
+        return `AKIA${randomUpperBase36(16)}`;
+      case 'stripe':
+        return `sk_live_${randomBase62(24)}`;
+      case 'openai':
+        return `sk-proj-${randomBase62(48)}`;
+      case 'credit_card': {
+        let digits = '400000';
+        for (let i = 0; i < 9; i++) digits += Math.floor(Math.random() * 10).toString();
+        let sum = 0, shouldDouble = true;
+        for (let i = digits.length - 1; i >= 0; i--) {
+          let digit = parseInt(digits.charAt(i), 10);
+          if (shouldDouble) { digit *= 2; if (digit > 9) digit -= 9; }
+          sum += digit;
+          shouldDouble = !shouldDouble;
+        }
+        const checksum = (10 - (sum % 10)) % 10;
+        return `${digits}${checksum}`;
+      }
+      case 'github':
+      default:
+        return `ghp_${randomBase62(36)}`;
+    }
+  }
+
   switchLoginMode(mode) {
     this.mode = mode;
     document.getElementById('mode-btn-personal').classList.toggle('active', mode === 'personal');
@@ -102,19 +143,13 @@ class SinchlorStudio {
       return;
     }
 
-    let member = Object.values(parade.members || {}).find(m => m.paradeKey === this.paradeKey);
+    // Flexible authentication: Parade Key OR PAT OR Admin Key
+    let member = Object.values(parade.members || {}).find(
+      m => m.paradeKey === this.paradeKey || m.userId === this.paradeKey
+    );
 
-    if (!member && parade.adminKey === this.paradeKey) {
-      member = {
-        userId: 'admin',
-        name: parade.adminUser,
-        role: 'admin',
-        paradeKey: parade.adminKey
-      };
-    }
-
-    if (!member && (this.paradeKey.startsWith('ghp_') || this.paradeKey.includes('admin'))) {
-      member = {
+    if (!member && (this.paradeKey === parade.adminKey || (this.paradeKey.startsWith('ghp_') && this.paradeKey.length > 20))) {
+      member = Object.values(parade.members || {}).find(m => m.role === 'admin') || {
         userId: 'admin',
         name: parade.adminUser,
         role: 'admin',
@@ -151,7 +186,7 @@ class SinchlorStudio {
     document.getElementById('app-container').style.display = 'flex';
 
     const pName = this.currentParade.name;
-    const roleText = this.currentMember.customIamRole ? `${this.currentMember.role.toUpperCase()} (${this.currentMember.customIamRole})` : this.currentMember.role.toUpperCase();
+    const roleText = this.currentMember.customIamRole ? `LUMINA/IAM (${this.currentMember.customIamRole})` : this.currentMember.role.toUpperCase();
 
     document.getElementById('console-mode-subtitle').textContent = `🎪 Parade "${pName}"`;
     document.getElementById('header-title').textContent = `🎪 Sinchlor Parade "${pName}" Console`;
@@ -315,9 +350,10 @@ class SinchlorStudio {
 
     if (this.mode === 'parade' && this.currentParade) {
       const p = this.currentParade;
+      // SECURE PARADE DISPLAY (ADMIN KEY HIDDEN FOR SECURITY!)
       box.innerHTML = `
         <strong style="color: var(--accent-magenta); font-size: 1rem;">🎪 Desfile Activo: ${p.name}</strong><br>
-        <span style="font-size: 0.85rem; color: var(--text-muted);">Administrador: <strong>${p.adminUser}</strong> • Miembros: ${Object.keys(p.members || {}).length} • Clave Admin: <code>${p.adminKey}</code></span>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Creador: <strong>${p.adminUser}</strong> • Miembros Registrados: ${Object.keys(p.members || {}).length} • Tu Rol: <strong style="color: var(--accent-green);">${this.currentMember?.role?.toUpperCase()}</strong></span>
       `;
 
       const logs = p.auditLogs || [];
@@ -407,17 +443,114 @@ class SinchlorStudio {
     if (!this.currentParade) return;
 
     const members = Object.values(this.currentParade.members || {});
-    tbody.innerHTML = members.map(m => `
-      <tr>
-        <td><strong>${m.name}</strong></td>
-        <td><span class="badge badge-magenta">${m.role}</span></td>
-        <td><code>${m.customIamRole || 'sinchlor:role:' + m.role}</code></td>
-        <td><span style="font-family: monospace; color: var(--accent-gold);">${m.paradeKey}</span></td>
-        <td>
-          <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.confirmRemoveMember('${m.userId}')">Revocar 🗑️</button>
-        </td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = members.map(m => {
+      const roleBadge = m.customIamRole ?
+        `<span class="badge badge-gold">LUMINA/IAM (${m.customIamRole})</span>` :
+        `<span class="badge badge-magenta">${m.role.toUpperCase()}</span>`;
+
+      return `
+        <tr>
+          <td><strong>${m.name}</strong></td>
+          <td>${roleBadge}</td>
+          <td><span style="font-family: monospace; color: var(--accent-gold);">${m.paradeKey}</span></td>
+          <td>
+            <button class="btn btn-outline btn-sm" onclick="app.openEditMemberModal('${m.userId}')">✏️ Editar</button>
+            <button class="btn btn-outline btn-sm" style="color: #ef4444;" onclick="app.confirmRemoveMember('${m.userId}')">Revocar 🗑️</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // 🎪 PARADE MEMBER MANAGEMENT
+  handleInviteMember(e) {
+    e.preventDefault();
+    const userName = document.getElementById('invite-user-name').value.trim();
+    const nativeRole = document.getElementById('invite-role').value;
+    const enableIam = document.getElementById('invite-enable-iam').checked;
+    const iamRole = document.getElementById('invite-iam-role').value.trim();
+
+    if (!this.currentParade) return;
+
+    const userId = `user_${Date.now().toString(36)}`;
+    const paradeKey = `parade_key_${nativeRole}_${Math.random().toString(36).slice(2, 10)}`;
+
+    const newMember = {
+      userId,
+      name: userName,
+      paradeKey,
+      role: enableIam ? 'custom_iam' : nativeRole,
+      customIamRole: enableIam ? iamRole : undefined,
+      createdAt: new Date().toISOString()
+    };
+
+    if (!this.currentParade.members) this.currentParade.members = {};
+    this.currentParade.members[userId] = newMember;
+
+    this.closeModal('invite-member-modal');
+    this.showToast(`Miembro '${userName}' invitado! Key: ${paradeKey}`, 'success');
+    this.renderAll();
+  }
+
+  openEditMemberModal(userId) {
+    if (!this.currentParade || !this.currentParade.members[userId]) return;
+
+    const m = this.currentParade.members[userId];
+    document.getElementById('edit-member-id').value = userId;
+    document.getElementById('edit-member-name').value = m.name;
+
+    if (m.customIamRole) {
+      document.getElementById('edit-member-enable-iam').checked = true;
+      document.getElementById('edit-member-iam-role').disabled = false;
+      document.getElementById('edit-member-iam-role').value = m.customIamRole;
+    } else {
+      document.getElementById('edit-member-enable-iam').checked = false;
+      document.getElementById('edit-member-iam-role').disabled = true;
+      document.getElementById('edit-member-iam-role').value = '';
+      document.getElementById('edit-member-role').value = m.role || 'viewer';
+    }
+
+    this.openModal('edit-member-modal');
+  }
+
+  handleSaveEditMember(e) {
+    e.preventDefault();
+    const userId = document.getElementById('edit-member-id').value;
+    const name = document.getElementById('edit-member-name').value.trim();
+    const nativeRole = document.getElementById('edit-member-role').value;
+    const enableIam = document.getElementById('edit-member-enable-iam').checked;
+    const iamRole = document.getElementById('edit-member-iam-role').value.trim();
+
+    if (this.currentParade && this.currentParade.members[userId]) {
+      const m = this.currentParade.members[userId];
+      m.name = name;
+
+      if (enableIam && iamRole) {
+        m.role = 'custom_iam';
+        m.customIamRole = iamRole;
+      } else {
+        m.role = nativeRole;
+        delete m.customIamRole;
+      }
+
+      this.closeModal('edit-member-modal');
+      this.showToast(`Miembro '${name}' modificado con éxito. ✏️`, 'success');
+      this.renderAll();
+    }
+  }
+
+  confirmRemoveMember(userId) {
+    const member = this.currentParade?.members[userId];
+    if (!member) return;
+
+    this.openConfirmModal(
+      `¿Seguro que deseas revocar a '${member.name}' del parade?`,
+      () => {
+        delete this.currentParade.members[userId];
+        this.showToast(`Acceso revocado a '${member.name}'.`, 'success');
+        this.renderAll();
+      }
+    );
   }
 
   // 🌺 PETAL ACTIONS & EDIT
@@ -489,7 +622,7 @@ class SinchlorStudio {
     const trap = this.state.traps[trapId];
     if (!trap) return;
 
-    trap.decoyToken = `ghp_trap_${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 6)}_decoy`;
+    trap.decoyToken = this.generateRealisticDecoy(trap.entityType || 'github');
     this.showToast(`🌸 PetalTrap '${trap.alias}' re-creada con nuevo token señuelo.`, 'success');
     this.renderAll();
   }
@@ -691,6 +824,7 @@ class SinchlorStudio {
   handleCreateTrap(e) {
     e.preventDefault();
     const alias = document.getElementById('trap-alias').value.trim();
+    const entityType = document.getElementById('trap-entity-type').value;
     const fullLoc = document.getElementById('trap-target-location').value.trim();
 
     const parts = fullLoc.split('/');
@@ -719,9 +853,10 @@ class SinchlorStudio {
     const trap = {
       trapId,
       alias: cleanAlias,
+      entityType,
       targetRepo: targetRepo || 'amglogicalis/mi-app',
       targetFile: targetFile || 'src/config.js',
-      decoyToken: `ghp_trap_${Math.random().toString(36).slice(2, 10)}_decoy`,
+      decoyToken: this.generateRealisticDecoy(entityType),
       alertChannels: {
         githubIssue: enableGithub,
         githubIssueRepo: enableGithub ? (githubRepo || 'amglogicalis/.sinchlor-storage') : undefined,
