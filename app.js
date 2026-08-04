@@ -1257,9 +1257,12 @@ class SinchlorStudio {
     const nectar = nectars[nectarId];
     if (!nectar) return;
 
+    const remainingMins = nectar.expiresAt ? Math.max(1, Math.round((new Date(nectar.expiresAt).getTime() - Date.now()) / 60000)) : 0;
+
     document.getElementById('edit-nectar-id').value = nectar.nectarId;
     document.getElementById('edit-nectar-alias').value = nectar.alias;
     document.getElementById('edit-nectar-secret').value = '';
+    document.getElementById('edit-nectar-ttl').value = nectar.expiresAt ? remainingMins : 0;
     document.getElementById('edit-nectar-single-use').checked = !!nectar.singleUse;
     document.getElementById('edit-nectar-reactivate').checked = false;
 
@@ -1276,7 +1279,7 @@ class SinchlorStudio {
     const nectarId = document.getElementById('edit-nectar-id').value;
     const alias = document.getElementById('edit-nectar-alias').value.trim();
     const secret = document.getElementById('edit-nectar-secret').value.trim();
-    const ttlMins = parseInt(document.getElementById('edit-nectar-ttl').value || '15', 10);
+    const ttlMins = parseInt(document.getElementById('edit-nectar-ttl').value || '0', 10);
     const singleUse = document.getElementById('edit-nectar-single-use').checked;
     const reactivate = document.getElementById('edit-nectar-reactivate').checked;
 
@@ -1287,8 +1290,13 @@ class SinchlorStudio {
       nectars[nectarId].singleUse = singleUse;
 
       if (secret) nectars[nectarId].secretValue = secret;
+
       if (ttlMins > 0) {
+        nectars[nectarId].ttlSeconds = ttlMins * 60;
         nectars[nectarId].expiresAt = new Date(Date.now() + ttlMins * 60000).toISOString();
+      } else {
+        nectars[nectarId].ttlSeconds = 0;
+        delete nectars[nectarId].expiresAt;
       }
 
       if (reactivate) {
