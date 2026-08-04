@@ -778,8 +778,24 @@ class SinchlorStudio {
 
     const members = Object.values(this.currentParade.members || {});
     tbody.innerHTML = members.map(m => {
+      let badgeLabel = 'LUMINA';
+      const roleLower = (m.customIamRole || '').toLowerCase();
+      const isAws = m.provider === 'aws_iam' || roleLower.includes('aws') || roleLower.includes('arn:aws:');
+      const isDeclarative = m.provider === 'custom_json' || roleLower.includes('sinchlor:policy:');
+      const isLumina = m.provider === 'lumina_role' || roleLower.includes('lumina:');
+
+      if (isAws) {
+        badgeLabel = 'AWS IAM';
+      } else if (isDeclarative) {
+        badgeLabel = 'DECLARATIVE JSON';
+      } else if (isLumina) {
+        badgeLabel = 'LUMINA';
+      } else if (m.customIamRole) {
+        badgeLabel = 'CUSTOM IAM';
+      }
+
       const roleBadge = m.customIamRole ?
-        `<span class="badge badge-gold">${m.provider === 'aws_iam' ? 'AWS IAM' : 'LUMINA'} (${m.customIamRole})</span>` :
+        `<span class="badge badge-gold">${badgeLabel} (${m.customIamRole})</span>` :
         `<span class="badge badge-magenta">${m.role.toUpperCase()}</span>`;
 
       return `
@@ -882,7 +898,16 @@ class SinchlorStudio {
     document.getElementById('edit-member-name').value = m.name;
     document.getElementById('edit-custom-parade-key').value = m.paradeKey || '';
 
-    const provider = m.provider || (m.customIamRole ? 'lumina_role' : 'sinchlor_native');
+    let provider = m.provider;
+    if (!provider) {
+      const roleLower = (m.customIamRole || '').toLowerCase();
+      if (roleLower.includes('aws') || roleLower.includes('arn:aws:')) provider = 'aws_iam';
+      else if (roleLower.includes('lumina:')) provider = 'lumina_role';
+      else if (roleLower.includes('sinchlor:policy:')) provider = 'custom_json';
+      else if (m.customIamRole) provider = 'lumina_role';
+      else provider = 'sinchlor_native';
+    }
+
     document.getElementById('edit-role-provider').value = provider;
     this.toggleRoleProviderFields('edit');
 
@@ -891,7 +916,7 @@ class SinchlorStudio {
     } else if (provider === 'lumina_role') {
       document.getElementById('edit-lumina-arn').value = m.customIamRole || '';
     } else if (provider === 'aws_iam') {
-      document.getElementById('edit-aws-role-name').value = m.customIamRole?.replace(/^aws:iam:/, '') || '';
+      document.getElementById('edit-aws-role-name').value = m.customIamRole?.replace(/^(aws:iam:|arn:aws:iam::[0-9]+:role\/)/, '') || '';
     }
 
     this.openModal('edit-member-modal');
