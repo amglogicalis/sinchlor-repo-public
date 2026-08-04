@@ -44,17 +44,25 @@ Accede a la consola interactiva de Sinchlor directamente desde la web o ejecúta
 
 ---
 
-## 🚀 Instalación Rápida
+## 🚀 Instalación Rápida por NPM (Única Forma de Uso Terminal / SDK)
+
+> [!IMPORTANT]
+> **La ÚNICA forma de utilizar SINCHLOR desde la consola de comandos (CLI) o integrarlo como SDK en tus proyectos de código es mediante la instalación de su paquete oficial en NPM (`terra-sinchlor`).**
 
 ```bash
-# Instalación global desde NPM
+# 1. Instalación global desde NPM (Requerido para comandos CLI en terminal)
 npm install -g terra-sinchlor
 
-# Configurar auto-inicio de contexto en terminal y guardián git pre-commit
+# 2. Configurar auto-inicio de contexto en terminal y guardián git pre-commit
 sinchlor setup
 
-# Verificar versión instalada
+# 3. Verificar versión e instalación correcta
 sinchlor --version
+```
+
+### 📦 Instalación Local en Proyecto (Para SDK de Node.js / TypeScript)
+```bash
+npm install terra-sinchlor
 ```
 
 ---
