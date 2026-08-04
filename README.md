@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo_sinchlor.png" alt="Sinchlor Logo" width="220" onerror="this.src='https://raw.githubusercontent.com/amglogicalis/sinchlor-repo-public/main/assets/logo_sinchlor.png'" />
+  <img src="https://raw.githubusercontent.com/amglogicalis/sinchlor-repo-public/main/assets/logo_sinchlor.png" alt="Sinchlor Logo" width="220" />
 </p>
 
 # 🛡️ SINCHLOR — Public Secrets Camouflage & Credentials Engine
@@ -34,7 +34,7 @@ Accede a la consola interactiva de Sinchlor directamente desde la web o ejecúta
 👉 **[ACCEDER A LA CONSOLA WEB ONLINE DE SINCHLOR](https://amglogicalis.github.io/sinchlor-repo-public/)**
 
 <p align="center">
-  <img src="assets/preview_consola_web.PNG" alt="Sinchlor Studio Web Console Preview" width="100%" style="border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);" onerror="this.src='https://raw.githubusercontent.com/amglogicalis/sinchlor-repo-public/main/assets/preview_consola_web.PNG'" />
+  <img src="https://raw.githubusercontent.com/amglogicalis/sinchlor-repo-public/main/assets/preview_consola_web.PNG" alt="Sinchlor Studio Web Console Preview" width="100%" />
 </p>
 
 ### Características de la Consola Web:
