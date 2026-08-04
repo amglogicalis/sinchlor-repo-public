@@ -119,8 +119,9 @@ body {
 }
 
 #mode-btn-parade.active {
-  background: var(--accent-magenta);
+  background: var(--primary);
   color: #fff;
+  box-shadow: 0 0 12px var(--primary-glow);
 }
 
 /* Form Controls */
@@ -170,19 +171,14 @@ body {
   transition: all 0.2s ease;
 }
 
-.btn-primary {
+.btn-primary, .btn-accent {
   background: var(--primary);
   color: #fff;
 }
 
-.btn-primary:hover {
+.btn-primary:hover, .btn-accent:hover {
   background: var(--primary-light);
   box-shadow: 0 0 16px var(--primary-glow);
-}
-
-.btn-accent {
-  background: var(--accent-magenta);
-  color: #fff;
 }
 
 .btn-outline {
