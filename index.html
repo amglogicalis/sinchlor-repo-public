@@ -508,6 +508,16 @@
           <input type="text" id="edit-trap-alias" required>
         </div>
         <div class="form-group">
+          <label for="edit-trap-entity-type">Entidad / Formato del Token Señuelo Realista</label>
+          <select id="edit-trap-entity-type" style="background: #0d1117; color: #fff; border: 1px solid var(--border);">
+            <option value="github">GitHub PAT (ghp_ + 36 Base62)</option>
+            <option value="aws">AWS Access Key (AKIA + 16 Upper Base36)</option>
+            <option value="stripe">Stripe Secret Key (sk_live_ + 24 Base62)</option>
+            <option value="openai">OpenAI API Key (sk-proj- + 48 Base62)</option>
+            <option value="credit_card">Tarjeta de Crédito / Luhn Valid Checksum</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label for="edit-trap-location">Ubicación Destino (usuario/repo/ruta)</label>
           <input type="text" id="edit-trap-location" placeholder="amglogicalis/mi-app/src/config.js" required>
         </div>

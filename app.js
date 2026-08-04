@@ -1121,6 +1121,7 @@ class SinchlorStudio {
 
     document.getElementById('edit-trap-id').value = trap.trapId;
     document.getElementById('edit-trap-alias').value = trap.alias;
+    document.getElementById('edit-trap-entity-type').value = trap.entityType || 'github';
     document.getElementById('edit-trap-location').value = fullLocation;
 
     document.getElementById('edit-trap-enable-github').checked = trap.alertChannels?.githubIssue !== false;
@@ -1145,6 +1146,7 @@ class SinchlorStudio {
 
     const trapId = document.getElementById('edit-trap-id').value;
     const alias = document.getElementById('edit-trap-alias').value.trim();
+    const entityType = document.getElementById('edit-trap-entity-type').value;
     const fullLoc = document.getElementById('edit-trap-location').value.trim();
 
     const parts = fullLoc.split('/');
@@ -1171,9 +1173,15 @@ class SinchlorStudio {
     const traps = this.getActiveTraps();
 
     if (traps[trapId]) {
+      const oldType = traps[trapId].entityType;
       traps[trapId].alias = alias;
       traps[trapId].targetRepo = targetRepo;
       traps[trapId].targetFile = targetFile;
+      
+      if (oldType !== entityType || !traps[trapId].decoyToken) {
+        traps[trapId].entityType = entityType;
+        traps[trapId].decoyToken = this.generateRealisticDecoy(entityType);
+      }
 
       traps[trapId].alertChannels = {
         githubIssue: enableGithub,
@@ -1184,8 +1192,8 @@ class SinchlorStudio {
       };
 
       this.closeModal('edit-trap-modal');
-      await this.saveVaultState(`Modificada PetalTrap ${alias}`);
-      this.showToast(`PetalTrap '${alias}' modificada con éxito. 🌸`, 'success');
+      await this.saveVaultState(`Modificada PetalTrap ${alias} (Señuelo: ${entityType})`);
+      this.showToast(`PetalTrap '${alias}' modificada con éxito (Formato Señuelo: ${entityType.toUpperCase()}). 🌸`, 'success');
       this.renderAll();
     }
   }
