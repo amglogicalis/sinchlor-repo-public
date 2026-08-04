@@ -45,7 +45,7 @@
           <label for="parade-key-input">Parade Access Key O GitHub PAT (O formato PAT:ParadeKey)</label>
           <input type="password" id="parade-key-input" placeholder="parade_key_•••••••• o ghp_••••••••" required>
         </div>
-        <button type="submit" class="btn btn-accent btn-block">Entrar al Desfile de Equipo 🎪</button>
+        <button type="submit" class="btn btn-primary btn-block">Entrar al Desfile de Equipo 🎪</button>
       </form>
     </div>
   </div>
@@ -149,9 +149,9 @@
             <h3>⚡ Accesos Rápidos</h3>
           </div>
           <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-            <button class="btn btn-primary btn-action-write" onclick="app.openModal('create-petal-modal')">🌺 Nuevo Pétalo Semántico</button>
-            <button class="btn btn-outline btn-action-write" onclick="app.openModal('create-trap-modal')">🌸 Plantar PetalTrap</button>
-            <button class="btn btn-outline btn-action-write" onclick="app.openModal('create-nectar-modal')">🏵️ Emitir Néctar Efímero</button>
+            <button class="btn btn-primary btn-action-write-petals" onclick="app.openModal('create-petal-modal')">🌺 Nuevo Pétalo Semántico</button>
+            <button class="btn btn-outline btn-action-create-trap" onclick="app.openModal('create-trap-modal')">🌸 Plantar PetalTrap</button>
+            <button class="btn btn-outline btn-action-create-nectar" onclick="app.openModal('create-nectar-modal')">🏵️ Emitir Néctar Efímero</button>
             <button class="btn btn-outline" onclick="app.switchTab('petalshield')">🛡️ Escanear Código (PetalShield)</button>
           </div>
         </div>
@@ -315,7 +315,7 @@
         <div class="card glass-panel">
           <div class="card-header">
             <h3>🏵️ Néctar Efímero (Credenciales TTL & 1-Solo Uso)</h3>
-            <button class="btn btn-outline btn-sm btn-action-write" onclick="app.openModal('create-nectar-modal')">➕ Emitir Néctar 🏵️</button>
+            <button class="btn btn-outline btn-sm btn-action-create-nectar" onclick="app.openModal('create-nectar-modal')">➕ Emitir Néctar 🏵️</button>
           </div>
           <div class="table-responsive">
             <table class="data-table">
@@ -377,22 +377,22 @@
         <h3>🌺 Crear Pétalo Semántico (Alias)</h3>
         <button class="close-btn" onclick="app.closeModal('create-petal-modal')">&times;</button>
       </div>
-      <form onsubmit="app.handleCreatePetal(event)">
+      <form onsubmit="app.handleCreatePetal(event)" autocomplete="off">
         <div class="form-group">
           <label for="petal-alias">Alias Semántico</label>
-          <input type="text" id="petal-alias" placeholder="gh-readonly" required>
+          <input type="text" id="petal-alias" placeholder="gh-readonly" required autocomplete="off">
         </div>
         <div class="form-group">
           <label for="petal-secret">Secret Real / Token Privado</label>
-          <input type="password" id="petal-secret" placeholder="ghp_••••••••••••••••••••••••••••••••" required>
+          <input type="password" id="petal-secret" placeholder="ghp_••••••••••••••••••••••••••••••••" required autocomplete="off" data-lpignore="true" data-form-type="other">
         </div>
         <div class="form-group">
           <label for="petal-category">Categoría</label>
-          <input type="text" id="petal-category" placeholder="github, aws, stripe">
+          <input type="text" id="petal-category" placeholder="github, aws, stripe" autocomplete="off">
         </div>
         <div class="form-group">
           <label for="petal-desc">Descripción (Opcional)</label>
-          <input type="text" id="petal-desc" placeholder="PAT de lectura para el servidor de desarrollo">
+          <input type="text" id="petal-desc" placeholder="PAT de lectura para el servidor de desarrollo" autocomplete="off">
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" onclick="app.closeModal('create-petal-modal')">Cancelar</button>
@@ -409,15 +409,15 @@
         <h3>🌺 Modificar Pétalo Semántico</h3>
         <button class="close-btn" onclick="app.closeModal('edit-petal-modal')">&times;</button>
       </div>
-      <form onsubmit="app.handleSaveEditPetal(event)">
+      <form onsubmit="app.handleSaveEditPetal(event)" autocomplete="off">
         <input type="hidden" id="edit-petal-old-alias">
         <div class="form-group">
           <label for="edit-petal-alias">Alias Semántico</label>
-          <input type="text" id="edit-petal-alias" required>
+          <input type="text" id="edit-petal-alias" required autocomplete="off">
         </div>
         <div class="form-group">
           <label for="edit-petal-secret">Nuevo Secret Real (Dejar en blanco para mantener el actual)</label>
-          <input type="password" id="edit-petal-secret" placeholder="••••••••••••">
+          <input type="password" id="edit-petal-secret" placeholder="••••••••••••" autocomplete="off" data-lpignore="true" data-form-type="other">
         </div>
         <div class="form-group">
           <label for="edit-petal-category">Categoría</label>
@@ -508,6 +508,16 @@
           <input type="text" id="edit-trap-alias" required>
         </div>
         <div class="form-group">
+          <label for="edit-trap-entity-type">Entidad / Formato del Token Señuelo Realista</label>
+          <select id="edit-trap-entity-type" style="background: #0d1117; color: #fff; border: 1px solid var(--border);">
+            <option value="github">GitHub PAT (ghp_ + 36 Base62)</option>
+            <option value="aws">AWS Access Key (AKIA + 16 Upper Base36)</option>
+            <option value="stripe">Stripe Secret Key (sk_live_ + 24 Base62)</option>
+            <option value="openai">OpenAI API Key (sk-proj- + 48 Base62)</option>
+            <option value="credit_card">Tarjeta de Crédito / Luhn Valid Checksum</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label for="edit-trap-location">Ubicación Destino (usuario/repo/ruta)</label>
           <input type="text" id="edit-trap-location" placeholder="amglogicalis/mi-app/src/config.js" required>
         </div>
@@ -551,14 +561,14 @@
         <h3>🏵️ Emitir Néctar Efímero</h3>
         <button class="close-btn" onclick="app.closeModal('create-nectar-modal')">&times;</button>
       </div>
-      <form onsubmit="app.handleCreateNectar(event)">
+      <form onsubmit="app.handleCreateNectar(event)" autocomplete="off">
         <div class="form-group">
           <label for="nectar-alias">Alias Néctar</label>
-          <input type="text" id="nectar-alias" placeholder="temp-aws-session" required>
+          <input type="text" id="nectar-alias" placeholder="temp-aws-session" required autocomplete="off">
         </div>
         <div class="form-group">
           <label for="nectar-secret">Secret Real</label>
-          <input type="password" id="nectar-secret" required placeholder="••••••••••••">
+          <input type="password" id="nectar-secret" required placeholder="••••••••••••" autocomplete="off" data-lpignore="true" data-form-type="other">
         </div>
         <div class="form-group">
           <label for="nectar-ttl">TTL en Minutos (0 = Sin tiempo expiración)</label>
@@ -584,15 +594,15 @@
         <h3>🏵️ Modificar Néctar Efímero</h3>
         <button class="close-btn" onclick="app.closeModal('edit-nectar-modal')">&times;</button>
       </div>
-      <form onsubmit="app.handleSaveEditNectar(event)">
+      <form onsubmit="app.handleSaveEditNectar(event)" autocomplete="off">
         <input type="hidden" id="edit-nectar-id">
         <div class="form-group">
           <label for="edit-nectar-alias">Alias Néctar</label>
-          <input type="text" id="edit-nectar-alias" required>
+          <input type="text" id="edit-nectar-alias" required autocomplete="off">
         </div>
         <div class="form-group">
           <label for="edit-nectar-secret">Nuevo Secret Real (Dejar en blanco para mantener)</label>
-          <input type="password" id="edit-nectar-secret" placeholder="••••••••">
+          <input type="password" id="edit-nectar-secret" placeholder="••••••••" autocomplete="off" data-lpignore="true" data-form-type="other">
         </div>
         <div class="form-group">
           <label for="edit-nectar-ttl">Refrescar TTL en Minutos (0 = Sin tiempo expiración)</label>
@@ -692,9 +702,15 @@
           </div>
         </div>
 
+        <!-- Parade Key Custom Input -->
+        <div class="form-group">
+          <label for="invite-custom-parade-key">Parade Access Key / Contraseña</label>
+          <input type="text" id="invite-custom-parade-key" placeholder="Dejar en blanco para auto-generar clave aleatoria">
+        </div>
+
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" onclick="app.closeModal('invite-member-modal')">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Generar Parade Key 🔑</button>
+          <button type="submit" class="btn btn-primary">Guardar e Invitar Miembro 🔑</button>
         </div>
       </form>
     </div>
@@ -712,6 +728,11 @@
         <div class="form-group">
           <label for="edit-member-name">Nombre del Usuario</label>
           <input type="text" id="edit-member-name" required>
+        </div>
+
+        <div class="form-group">
+          <label for="edit-custom-parade-key">Parade Access Key / Contraseña</label>
+          <input type="text" id="edit-custom-parade-key" placeholder="Permite restablecer o cambiar la clave de acceso del usuario" required>
         </div>
 
         <div class="form-group">
